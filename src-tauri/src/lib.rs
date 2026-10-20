@@ -400,7 +400,7 @@ pub fn run() {
 /// 构建系统托盘图标与菜单
 fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
-    use tauri::tray::TrayIconEvent;
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 
     let show = MenuItemBuilder::with_id("show", "显示主窗口").build(app)?;
     let new = MenuItemBuilder::with_id("new", "新建下载").build(app)?;
@@ -452,16 +452,40 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some("TDM Downloader"));
         let _ = tray.set_menu(Some(menu));
+        // Tauri 默认左键也会弹出托盘菜单（tray-icon 默认 menu_on_left_click = true），
+        // 会和「左键切换主窗口」打架：菜单刚弹出就被抢焦点的窗口挤掉。
+        // 关掉它，约定：左键 = 显示/隐藏窗口，右键 = 弹出菜单。
+        let _ = tray.set_show_menu_on_left_click(false);
         tray.on_tray_icon_event(move |_tray, e| {
-            if let TrayIconEvent::Click { .. } = e {
-                if let Some(w) = handle.get_webview_window("main") {
-                    if w.is_visible().unwrap_or(false) {
-                        let _ = w.hide();
-                    } else {
-                        let _ = w.unminimize();
-                        let _ = w.show();
-                        let _ = w.set_focus();
-                    }
+            // 只响应「左键单击抬起」来切换窗口。
+            // 右键点击由系统弹出托盘菜单，此时绝不能 show/set_focus 主窗口，
+            // 否则主窗口会抢走焦点，导致刚弹出的菜单瞬间消失（表现为闪一下就没了）。
+            let left_click = matches!(
+                e,
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                }
+            );
+            // 左键双击：展开窗口（双击时至少会收到一次 Click，这里只做兜底）
+            let left_dbl = matches!(
+                e,
+                TrayIconEvent::DoubleClick {
+                    button: MouseButton::Left,
+                    ..
+                }
+            );
+            if !left_click && !left_dbl {
+                return;
+            }
+            if let Some(w) = handle.get_webview_window("main") {
+                if w.is_visible().unwrap_or(false) {
+                    let _ = w.hide();
+                } else {
+                    let _ = w.unminimize();
+                    let _ = w.show();
+                    let _ = w.set_focus();
                 }
             }
         });
