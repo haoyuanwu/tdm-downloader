@@ -1,0 +1,36 @@
+# Rust / Tauri build artifacts
+src-tauri/target/
+**/target/
+src-tauri/gen/schemas/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Build outputs (installer / portable exe)
+src-tauri/target/release/bundle/
+*.msi
+*.nsis.zip
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Temporary download parts produced at runtime
+*.part
+*.part*
+*.tdmstate.json

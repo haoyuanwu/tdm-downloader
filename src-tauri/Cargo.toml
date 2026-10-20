@@ -1,0 +1,36 @@
+[package]
+name = "tdm-downloader"
+version = "0.1.0"
+description = "A fast multi-threaded download manager built with Tauri 2"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "tdm_downloader_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1.44.2", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
+futures-util = "0.3.31"
+url = "2"
+percent-encoding = "2"
+chrono = { version = "0.4.41", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+
+# Windows: 读取系统代理（Internet Settings 注册表）
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

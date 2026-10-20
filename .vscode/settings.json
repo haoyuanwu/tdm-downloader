@@ -1,0 +1,27 @@
+{
+  // 排除构建产物，避免搜索/文件树被几 GB 的缓存淹没
+  "files.exclude": {
+    "**/src-tauri/target": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/src-tauri/gen": true
+  },
+  "search.exclude": {
+    "**/src-tauri/target": true,
+    "**/node_modules": true,
+    "**/dist": true
+  },
+  // Rust
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.cargo.features": [],
+  "rust-analyzer.linkedProjects": ["src-tauri/Cargo.toml"],
+  // 前端
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  },
+  "files.associations": {
+    "*.jsonc": "jsonc"
+  }
+}
