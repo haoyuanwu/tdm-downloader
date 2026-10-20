@@ -1,13 +1,15 @@
 {
   "name": "tdm-downloader",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "package": "tauri build && node scripts/rename-artifacts.mjs",
+    "package:prefix": "tauri build && node scripts/rename-artifacts.mjs --prefix=TDM-Downloader"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

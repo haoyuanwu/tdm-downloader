@@ -586,3 +586,79 @@ select:focus {
   background: var(--bg-hover);
   color: var(--text);
 }
+
+/* ── 悬停提示（Tooltip） ── */
+/* 锚点：inline-flex 保证包裹按钮时不改变布局 */
+.tooltip-anchor {
+  display: inline-flex;
+}
+
+/* 渲染到 body 上的 fixed 气泡，避免被任务列表的滚动容器裁剪 */
+.tooltip {
+  position: fixed;
+  z-index: 9999;
+  max-width: 260px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  animation: tooltip-in 0.12s ease-out;
+}
+
+.tooltip-top {
+  transform: translate(-50%, -100%);
+}
+
+.tooltip-bottom {
+  transform: translate(-50%, 0);
+}
+
+/* 箭头 */
+.tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  margin-left: -5px;
+  border: 5px solid transparent;
+}
+
+.tooltip-top::after {
+  top: 100%;
+  border-top-color: var(--bg-elev);
+}
+
+.tooltip-bottom::after {
+  bottom: 100%;
+  border-bottom-color: var(--bg-elev);
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% + 3px));
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tooltip-in-bottom {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -3px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tooltip-bottom {
+  animation-name: tooltip-in-bottom;
+}

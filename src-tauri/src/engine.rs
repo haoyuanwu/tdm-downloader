@@ -234,17 +234,23 @@ pub fn build_task_client(cfg: &ClientConfig) -> reqwest::Client {
 
 // ────────────────────────── 限速器 ──────────────────────────
 
-/// 基于 1 秒时间窗口的限速器。limit == 0 表示不限速。
+/// 令牌桶限速器。limit == 0 表示不限速。
+///
+/// 桶容量 = 1 秒的配额，但初始为空桶，因此平均速率不会超过 limit 字节/秒
+/// （不做首次突发，避免短任务看起来没被限速）。
+/// 相比早期的「1 秒固定窗口」实现，令牌桶不会因为窗口滚动而白送配额。
 pub struct Limiter {
     limit: AtomicU64,
-    window: Mutex<(Instant, u64)>,
+    /// (上次补充令牌的时刻, 当前令牌数，可为负表示需要等待)
+    bucket: Mutex<(Instant, f64)>,
 }
 
 impl Limiter {
     pub fn new(limit: u64) -> Self {
         Limiter {
             limit: AtomicU64::new(limit),
-            window: Mutex::new((Instant::now(), 0)),
+            // 初始空桶：严格限速，平均速率 <= limit
+            bucket: Mutex::new((Instant::now(), 0.0)),
         }
     }
 
@@ -252,32 +258,25 @@ impl Limiter {
         self.limit.store(limit, Ordering::SeqCst);
     }
 
-    /// 消费 n 字节配额，超出则休眠等待
+    /// 消费 n 字节配额，令牌不足则休眠到补齐为止
     pub async fn take(&self, n: u64) {
         let limit = self.limit.load(Ordering::SeqCst);
         if limit == 0 || n == 0 {
             return;
         }
-        let mut w = self.window.lock().await;
+        let rate = limit as f64; // 字节/秒
+        let mut b = self.bucket.lock().await;
         let now = Instant::now();
-        if now.duration_since(w.0) >= Duration::from_secs(1) {
-            w.0 = now;
-            w.1 = 0;
-        }
-        if w.1 + n > limit {
-            let excess = w.1 + n - limit;
-            let wait = Duration::from_secs_f64(excess as f64 / limit as f64);
-            drop(w);
+        let elapsed = now.saturating_duration_since(b.0).as_secs_f64();
+        b.0 = now;
+        // 按流逝时间补充令牌，桶容量上限为 1 秒的配额
+        b.1 = (b.1 + elapsed * rate).min(rate);
+        b.1 -= n as f64;
+        if b.1 < 0.0 {
+            // 欠账：休眠到令牌回正（这段时间会在下次 take 时自动补回）
+            let wait = Duration::from_secs_f64((-b.1) / rate);
+            drop(b);
             tokio::time::sleep(wait).await;
-            let mut w = self.window.lock().await;
-            let now = Instant::now();
-            if now.duration_since(w.0) >= Duration::from_secs(1) {
-                w.0 = now;
-                w.1 = 0;
-            }
-            w.1 += n;
-        } else {
-            w.1 += n;
         }
     }
 }

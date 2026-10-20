@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { DownloadTask } from "../types";
 import { formatBytes, formatEta, formatSpeed, STATUS_COLOR, STATUS_LABEL } from "../types";
+import { Tooltip } from "./Tooltip";
 
 interface Props {
   task: DownloadTask;
@@ -103,44 +104,50 @@ export function TaskCard({
 
         <div className="task-actions">
           {isPausable && (
-            <button className="btn btn-icon" onClick={() => onPause(task.id)} title="暂停">
-              ⏸
-            </button>
+            <Tooltip text="暂停">
+              <button className="btn btn-icon" onClick={() => onPause(task.id)}>
+                ⏸
+              </button>
+            </Tooltip>
           )}
           {isResumable && (
-            <button
-              className="btn btn-icon"
-              onClick={() => onResume(task.id)}
-              title={task.status === "failed" ? "重试" : "继续"}
-            >
-              ▶
-            </button>
+            <Tooltip text={task.status === "failed" ? "重试" : "继续"}>
+              <button className="btn btn-icon" onClick={() => onResume(task.id)}>
+                ▶
+              </button>
+            </Tooltip>
           )}
           {isActive && (
-            <button className="btn btn-icon" onClick={() => onCancel(task.id)} title="取消">
-              ✕
-            </button>
+            <Tooltip text="取消下载">
+              <button className="btn btn-icon" onClick={() => onCancel(task.id)}>
+                ✕
+              </button>
+            </Tooltip>
           )}
           {isDone && (
-            <button className="btn btn-icon" onClick={() => onOpen(task)} title="打开文件">
-              📂
-            </button>
+            <Tooltip text="打开文件">
+              <button className="btn btn-icon" onClick={() => onOpen(task)}>
+                📂
+              </button>
+            </Tooltip>
           )}
           {!isActive && (
-            <button className="btn btn-icon" onClick={() => onOpenDir(task)} title="打开所在目录">
-              📁
-            </button>
+            <Tooltip text="打开所在目录">
+              <button className="btn btn-icon" onClick={() => onOpenDir(task)}>
+                📁
+              </button>
+            </Tooltip>
           )}
-          <button className="btn btn-icon" onClick={copyUrl} title="复制链接">
-            🔗
-          </button>
-          <button
-            className="btn btn-icon btn-danger"
-            onClick={() => onRemove(task.id)}
-            title="从列表移除"
-          >
-            🗑
-          </button>
+          <Tooltip text="复制链接">
+            <button className="btn btn-icon" onClick={copyUrl}>
+              🔗
+            </button>
+          </Tooltip>
+          <Tooltip text={isActive ? "取消并从列表移除" : "从列表移除"}>
+            <button className="btn btn-icon btn-danger" onClick={() => onRemove(task.id)}>
+              🗑
+            </button>
+          </Tooltip>
         </div>
       </div>
 

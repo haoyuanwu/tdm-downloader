@@ -3,6 +3,7 @@ import { api, onNewTask, onProgress, onTasks } from "./api";
 import { NewDownloadDialog } from "./components/NewDownloadDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { TaskCard } from "./components/TaskCard";
+import { Tooltip } from "./components/Tooltip";
 import type { AppInfo, DownloadTask, NewTaskRequest, Settings } from "./types";
 import { DEFAULT_SETTINGS, formatBytes, formatSpeed } from "./types";
 
@@ -246,30 +247,50 @@ export default function App() {
           onChange={(e) => setQuery(e.target.value)}
         />
 
-        <button className="btn" onClick={pauseAll} disabled={stats.activeCount === 0} title="暂停全部">
-          ⏸ 全部暂停
-        </button>
-        <button className="btn" onClick={resumeAll} disabled={stats.pausedCount === 0} title="恢复全部">
-          ▶ 全部继续
-        </button>
-        <button className="btn btn-primary" onClick={() => setShowNew(true)}>
-          + 新建下载
-        </button>
-        <button className="btn" onClick={() => setShowSettings(true)}>
-          ⚙
-        </button>
+        <Tooltip text="暂停所有进行中的任务">
+          <button
+            className="btn"
+            onClick={pauseAll}
+            disabled={stats.activeCount === 0}
+          >
+            ⏸ 全部暂停
+          </button>
+        </Tooltip>
+        <Tooltip text="继续所有已暂停或失败的任务">
+          <button
+            className="btn"
+            onClick={resumeAll}
+            disabled={stats.pausedCount === 0}
+          >
+            ▶ 全部继续
+          </button>
+        </Tooltip>
+        <Tooltip text="新建下载任务，可一次粘贴多个链接">
+          <button className="btn btn-primary" onClick={() => setShowNew(true)}>
+            + 新建下载
+          </button>
+        </Tooltip>
+        <Tooltip text="设置">
+          <button className="btn" onClick={() => setShowSettings(true)}>
+            ⚙
+          </button>
+        </Tooltip>
       </div>
 
       {clipboardUrl && (
         <div className="clipboard-bar">
           <span className="dim">检测到剪贴板链接：</span>
           <span className="ellipsis">{clipboardUrl}</span>
-          <button className="btn btn-icon" onClick={() => setShowNew(true)}>
-            下载
-          </button>
-          <button className="btn btn-icon" onClick={() => setClipboardUrl(undefined)}>
-            ✕
-          </button>
+          <Tooltip text="用这个链接新建下载">
+            <button className="btn btn-icon" onClick={() => setShowNew(true)}>
+              下载
+            </button>
+          </Tooltip>
+          <Tooltip text="忽略这个链接">
+            <button className="btn btn-icon" onClick={() => setClipboardUrl(undefined)}>
+              ✕
+            </button>
+          </Tooltip>
         </div>
       )}
 
@@ -320,15 +341,17 @@ export default function App() {
           {appInfo && ` · v${appInfo.version}`}
         </span>
         {tasks.some((t) => t.status === "completed") && (
-          <button
-            className="btn btn-icon"
-            onClick={async () => {
-              await api.clearCompleted();
-              await refresh();
-            }}
-          >
-            清空已完成
-          </button>
+          <Tooltip text="清空列表中已完成的任务（不删除已下载的文件）">
+            <button
+              className="btn btn-icon"
+              onClick={async () => {
+                await api.clearCompleted();
+                await refresh();
+              }}
+            >
+              清空已完成
+            </button>
+          </Tooltip>
         )}
       </div>
 

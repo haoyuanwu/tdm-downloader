@@ -10,6 +10,7 @@ dist/
 
 # Build outputs (installer / portable exe)
 src-tauri/target/release/bundle/
+release/
 *.msi
 *.nsis.zip
 

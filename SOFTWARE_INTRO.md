@@ -63,15 +63,17 @@
 
 ### 方式 A：安装包（推荐）
 
-下载 `TDM-Downloader_0.2.0_x64-setup.exe`，双击一路下一步。
+下载 `0.2.1_x64-setup.exe`，双击一路下一步。
 
 - 约 3 MB，安装到当前用户目录，**不需要管理员权限**
 - 自动创建开始菜单快捷方式和卸载入口
 - 安装界面为简体中文
 
+> 文件名就是版本号，便于一眼分辨；始终想拿最新版用 `latest_x64-setup.exe`。
+
 ### 方式 B：免安装版
 
-下载 `tdm-downloader.exe`（约 15 MB），放到任意目录直接双击运行。适合放 U 盘随身带。
+下载 `0.2.1_x64_portable.exe`（约 15 MB），放到任意目录直接双击运行。适合放 U 盘随身带。
 
 ### 方式 C：从源码构建
 
@@ -79,7 +81,7 @@
 
 ```bash
 npm install
-npm run tauri build
+npm run package        # 产物输出到 release/，文件名即版本号
 ```
 
 详细命令见 `COMMANDS.md`。
