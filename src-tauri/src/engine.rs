@@ -8,7 +8,8 @@
 //! - 分片合并
 
 use crate::models::{
-    DownloadTask, NewTaskRequest, ProgressEvent, SegmentProgress, Settings, TaskStatus,
+    AfterFinishAction, DownloadTask, FileExistsAction, NewTaskRequest, ProgressEvent, ProxyMode,
+    SegmentProgress, Settings, TaskStatus,
 };
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -120,49 +121,110 @@ fn with_scheme(v: &str) -> String {
     }
 }
 
-/// 构造统一配置的 HTTP 客户端（自动识别系统代理）
+/// 构造 HTTP 客户端所需的配置
+#[derive(Debug, Clone)]
+pub struct ClientConfig {
+    pub proxy_mode: ProxyMode,
+    pub proxy_addr: String,
+    pub user_agent: String,
+    pub headers: Vec<(String, String)>,
+}
+
+impl Default for ClientConfig {
+    fn default() -> Self {
+        ClientConfig {
+            proxy_mode: ProxyMode::System,
+            proxy_addr: String::new(),
+            user_agent: DEFAULT_UA.to_string(),
+            headers: Vec::new(),
+        }
+    }
+}
+
+/// 构造统一配置的 HTTP 客户端（默认跟随系统代理）
 pub fn build_http_client() -> reqwest::Client {
+    build_task_client(&ClientConfig::default())
+}
+
+/// 按配置构造客户端：支持代理模式、自定义 UA 与附加请求头
+pub fn build_task_client(cfg: &ClientConfig) -> reqwest::Client {
+    let ua = if cfg.user_agent.trim().is_empty() {
+        DEFAULT_UA
+    } else {
+        cfg.user_agent.as_str()
+    };
+
     let mut builder = reqwest::Client::builder()
-        .user_agent(DEFAULT_UA)
+        .user_agent(ua)
         .connect_timeout(Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(10));
 
-    let use_env = std::env::var("TDM_USE_ENV_PROXY")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
+    // 附加请求头（Referer / Cookie / Authorization 等）
+    let mut hm = reqwest::header::HeaderMap::new();
+    for (k, v) in cfg.headers.iter() {
+        if k.trim().is_empty() {
+            continue;
+        }
+        if let (Ok(name), Ok(val)) = (
+            reqwest::header::HeaderName::from_bytes(k.trim().as_bytes()),
+            reqwest::header::HeaderValue::from_str(v),
+        ) {
+            hm.insert(name, val);
+        }
+    }
+    if !hm.is_empty() {
+        builder = builder.default_headers(hm);
+    }
 
-    #[cfg(windows)]
-    {
-        if use_env {
-            // 显式要求：交给 reqwest 默认逻辑（读环境变量）
-        } else {
-            match windows_system_proxy() {
-                Some((addr, bypass)) => {
-                    if let Some(url) = normalize_proxy_addr(&addr) {
-                        if let Ok(p) = reqwest::Proxy::all(&url) {
-                            let p = match bypass {
-                                Some(b) if !b.trim().is_empty() => p.no_proxy(
-                                    reqwest::NoProxy::from_string(
-                                        &b.replace(';', ",").replace("<local>", ""),
-                                    ),
-                                ),
-                                _ => p,
-                            };
-                            builder = builder.proxy(p);
-                        }
-                    }
-                }
-                None => {
-                    // 系统未启用代理：忽略环境变量，避免被无效的 env 代理劫持
-                    builder = builder.no_proxy();
+    match cfg.proxy_mode {
+        // 直连：忽略系统代理与环境变量
+        ProxyMode::None => {
+            builder = builder.no_proxy();
+        }
+        // 自定义代理
+        ProxyMode::Custom => {
+            if let Some(url) = normalize_proxy_addr(&cfg.proxy_addr) {
+                if let Ok(p) = reqwest::Proxy::all(&url) {
+                    builder = builder.proxy(p);
                 }
             }
         }
-    }
-
-    #[cfg(not(windows))]
-    {
-        let _ = use_env; // 非 Windows 沿用 reqwest 默认（环境变量）
+        ProxyMode::System => {
+            #[cfg(windows)]
+            {
+                // 逃生阀：TDM_USE_ENV_PROXY=1 时回到「由环境变量决定」的默认行为
+                let use_env = std::env::var("TDM_USE_ENV_PROXY")
+                    .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                    .unwrap_or(false);
+                if !use_env {
+                    match windows_system_proxy() {
+                        Some((addr, bypass)) => {
+                            if let Some(url) = normalize_proxy_addr(&addr) {
+                                if let Ok(p) = reqwest::Proxy::all(&url) {
+                                    let p = match bypass {
+                                        Some(b) if !b.trim().is_empty() => p.no_proxy(
+                                            reqwest::NoProxy::from_string(
+                                                &b.replace(';', ",").replace("<local>", ""),
+                                            ),
+                                        ),
+                                        _ => p,
+                                    };
+                                    builder = builder.proxy(p);
+                                }
+                            }
+                        }
+                        None => {
+                            // 系统未启用代理：忽略环境变量，避免被无效的 env 代理劫持
+                            builder = builder.no_proxy();
+                        }
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                // 非 Windows 沿用 reqwest 默认（环境变量）
+            }
+        }
     }
 
     builder
@@ -911,6 +973,28 @@ pub async fn run_task(
         })
     };
 
+    // 按任务配置构建独立 HTTP 客户端（代理模式 / UA / 自定义请求头）
+    let task_client = {
+        let (ua, headers) = {
+            let t = handle.task.lock().await;
+            (t.user_agent.clone(), t.headers.clone())
+        };
+        let settings = engine.settings.lock().await;
+        let ua_final = if ua.trim().is_empty() {
+            settings.user_agent.clone()
+        } else {
+            ua
+        };
+        let cfg = ClientConfig {
+            proxy_mode: settings.proxy_mode,
+            proxy_addr: settings.proxy_addr.clone(),
+            user_agent: ua_final,
+            headers,
+        };
+        drop(settings);
+        build_task_client(&cfg)
+    };
+
     // 1. 探测资源
     {
         let mut t = handle.task.lock().await;
@@ -926,7 +1010,7 @@ pub async fn run_task(
         )
     };
 
-    let probe_res = probe(&engine.client, &url).await;
+    let probe_res = probe(&task_client, &url).await;
     let (total_size, accept_ranges, server_filename) = match probe_res {
         Ok(p) => (p.total_size, p.accept_ranges, p.filename),
         Err(e) => {
@@ -941,22 +1025,48 @@ pub async fn run_task(
     };
 
     // 文件名：请求指定 > 服务端 Content-Disposition > URL 推断
-    {
+    let skipped = {
         let mut t = handle.task.lock().await;
         if t.filename.is_empty() || t.filename == "download" {
             if let Some(f) = server_filename.clone() {
                 t.filename = f;
             }
         }
+        t.resumable = accept_ranges;
         let dir = Path::new(&t.save_path).parent().unwrap_or(Path::new(".")).to_path_buf();
         let _ = fs::create_dir_all(&dir);
-        let full = unique_path(&dir, &t.filename);
+        let action = { let s = engine.settings.lock().await; s.file_exists };
+        let direct = dir.join(&t.filename);
+        let (full, skip) = match action {
+            FileExistsAction::Overwrite => (direct, false),
+            FileExistsAction::Skip => (direct.clone(), direct.exists()),
+            FileExistsAction::Rename => (unique_path(&dir, &t.filename), false),
+        };
         t.filename = full
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| t.filename.clone());
         t.save_path = full.to_string_lossy().to_string();
         t.total_size = total_size;
+        if skip {
+            t.status = TaskStatus::Completed;
+            t.downloaded = total_size;
+            t.finished_at = Some(now_ms());
+            t.error = Some("文件已存在，按设置跳过".to_string());
+        }
+        skip
+    };
+
+    if skipped {
+        mon_cancel.store(true, Ordering::SeqCst);
+        let _ = mon.await;
+        let snapshot = {
+            let t = handle.task.lock().await;
+            t.clone()
+        };
+        notify(&app, &engine, snapshot).await;
+        maybe_run_after_finish(&app, &engine).await;
+        return;
     }
 
     let (save_path, total_size, unbounded) = {
@@ -995,7 +1105,7 @@ pub async fn run_task(
         if s.done {
             continue;
         }
-        let client = engine.client.clone();
+        let client = task_client.clone();
         let url_c = url.clone();
         let part = part_path(&save_path, s.index);
         let idx = s.index;
@@ -1085,6 +1195,9 @@ pub async fn run_task(
         t.clone()
     };
     notify(&app, &engine, snapshot).await;
+
+    // 全部任务结束后，按设置执行收尾动作（退出 / 关机 / 休眠）
+    maybe_run_after_finish(&app, &engine).await;
 }
 
 /// 推送单个任务更新 + 任务列表更新
@@ -1092,6 +1205,62 @@ async fn notify(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>, task: Down
     let _ = app.emit(format!("download://task/{}", task.id).as_str(), task);
     let list = engine.snapshot().await;
     let _ = app.emit(EVT_TASKS, list);
+}
+
+/// 所有任务都结束后，按设置执行收尾动作
+///
+/// 只要还有未终结的任务（进行中 / 暂停 / 等待）就不触发，避免误关机。
+pub async fn maybe_run_after_finish(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>) {
+    let action = {
+        let s = engine.settings.lock().await;
+        s.after_finish
+    };
+    if action == AfterFinishAction::None {
+        return;
+    }
+    let list = engine.snapshot().await;
+    if list.is_empty() {
+        return;
+    }
+    if list.iter().any(|t| !t.status.is_terminal()) {
+        return;
+    }
+
+    match action {
+        AfterFinishAction::Quit => app.exit(0),
+        AfterFinishAction::Shutdown => {
+            let _ = system_power(true);
+        }
+        AfterFinishAction::Sleep => {
+            let _ = system_power(false);
+        }
+        AfterFinishAction::None => {}
+    }
+}
+
+/// 执行系统关机 / 休眠（Windows）
+fn system_power(shutdown: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if shutdown {
+            std::process::Command::new("shutdown")
+                .args(["/s", "/t", "30", "/c", "TDM Downloader: all downloads finished."])
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        } else {
+            std::process::Command::new("rundll32.exe")
+                .args(["powrprof.dll,SetSuspendState", "0,1,0"])
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = shutdown;
+        Err("当前平台不支持该操作".to_string())
+    }
 }
 
 /// 新建任务并入队
@@ -1121,6 +1290,7 @@ pub async fn spawn_task(
     let filename = sanitize_filename(&filename);
 
     let id = uuid::Uuid::new_v4().to_string();
+    let start_paused = req.start_paused.unwrap_or(false);
     let task = DownloadTask {
         id: id.clone(),
         url: req.url.clone(),
@@ -1128,13 +1298,20 @@ pub async fn spawn_task(
         filename,
         total_size: 0,
         downloaded: 0,
-        status: TaskStatus::Pending,
+        status: if start_paused {
+            TaskStatus::Paused
+        } else {
+            TaskStatus::Pending
+        },
         segments: Vec::new(),
         connections,
         speed_limit,
         error: None,
         created_at: now_ms(),
         finished_at: None,
+        user_agent: req.user_agent.clone().unwrap_or_default(),
+        headers: req.headers.clone().unwrap_or_default(),
+        resumable: false,
     };
 
     let handle = TaskHandle::new(task.clone());
@@ -1143,10 +1320,15 @@ pub async fn spawn_task(
         map.insert(id.clone(), handle.clone());
     }
 
-    let e2 = engine.clone();
-    tokio::spawn(async move {
-        run_task(app, e2, handle).await;
-    });
+    // 「稍后开始」的任务不立即启动，等待用户手动继续
+    if !start_paused {
+        let e2 = engine.clone();
+        let handle_c = handle.clone();
+        let app_c = app.clone();
+        tokio::spawn(async move {
+            run_task(app_c, e2, handle_c).await;
+        });
+    }
 
     Ok(task)
 }
@@ -1184,6 +1366,40 @@ pub async fn resume_task(
         run_task(app, e2, handle).await;
     });
     Ok(())
+}
+
+/// 暂停全部进行中的任务
+pub async fn pause_all(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>) {
+    let ids: Vec<String> = {
+        let list = engine.snapshot().await;
+        list.into_iter()
+            .filter(|t| t.status.is_active())
+            .map(|t| t.id)
+            .collect()
+    };
+    for id in ids {
+        let _ = pause_task(engine, &id).await;
+    }
+    let list = engine.snapshot().await;
+    let _ = app.emit(EVT_TASKS, list);
+}
+
+/// 恢复全部暂停 / 失败的任务
+pub async fn resume_all(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>) {
+    let ids: Vec<String> = {
+        let list = engine.snapshot().await;
+        list.into_iter()
+            .filter(|t| {
+                t.status == TaskStatus::Paused || t.status == TaskStatus::Failed
+            })
+            .map(|t| t.id)
+            .collect()
+    };
+    for id in ids {
+        let _ = resume_task(app.clone(), Arc::clone(engine), &id).await;
+    }
+    let list = engine.snapshot().await;
+    let _ = app.emit(EVT_TASKS, list);
 }
 
 /// 取消
@@ -1319,6 +1535,9 @@ mod tests {
             error: None,
             created_at: 0,
             finished_at: None,
+            user_agent: String::new(),
+            headers: Vec::new(),
+            resumable: false,
         }
     }
 

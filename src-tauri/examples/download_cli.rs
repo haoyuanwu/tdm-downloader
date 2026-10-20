@@ -83,6 +83,9 @@ async fn main() -> Result<(), String> {
         error: None,
         created_at: 0,
         finished_at: None,
+        user_agent: String::new(),
+        headers: Vec::new(),
+        resumable: p.accept_ranges,
     }));
 
     // 3. 进度打印协程

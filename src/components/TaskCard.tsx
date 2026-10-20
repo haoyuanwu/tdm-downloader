@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api";
 import type { DownloadTask } from "../types";
 import { formatBytes, formatEta, formatSpeed, STATUS_COLOR, STATUS_LABEL } from "../types";
 
@@ -12,6 +14,23 @@ interface Props {
   onOpenDir: (task: DownloadTask) => void;
 }
 
+/** 速度迷你曲线：最近 60 个采样点 */
+function Sparkline({ data }: { data: number[] }) {
+  if (data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const w = 120;
+  const h = 26;
+  const step = w / (data.length - 1);
+  const points = data
+    .map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * (h - 2) - 1).toFixed(1)}`)
+    .join(" ");
+  return (
+    <svg className="sparkline" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={1.5} />
+    </svg>
+  );
+}
+
 export function TaskCard({
   task,
   speed,
@@ -24,7 +43,10 @@ export function TaskCard({
 }: Props) {
   const total = task.total_size || 0;
   const pct = total > 0 ? Math.min((task.downloaded / total) * 100, 100) : 0;
-  const isActive = task.status === "downloading" || task.status === "connecting" || task.status === "merging";
+  const isActive =
+    task.status === "downloading" ||
+    task.status === "connecting" ||
+    task.status === "merging";
   const isPausable = isActive;
   const isResumable = task.status === "paused" || task.status === "failed";
   const isDone = task.status === "completed";
@@ -36,10 +58,25 @@ export function TaskCard({
       ? "progress-fill paused"
       : "progress-fill";
 
-  const eta =
-    isActive && speed > 0 && total > task.downloaded
-      ? (total - task.downloaded) / speed
-      : null;
+  const eta = isActive && speed > 0 && total > task.downloaded ? (total - task.downloaded) / speed : null;
+
+  // 速度采样历史
+  const [history, setHistory] = useState<number[]>([]);
+  const lastSpeed = useRef(0);
+  useEffect(() => {
+    if (!isActive) return;
+    if (speed === lastSpeed.current && history.length > 0) return;
+    lastSpeed.current = speed;
+    setHistory((h) => [...h, speed].slice(-60));
+  }, [speed, isActive, history.length]);
+
+  const copyUrl = async () => {
+    try {
+      await api.copyText(task.url);
+    } catch {
+      /* 忽略 */
+    }
+  };
 
   return (
     <div className="task-card">
@@ -49,15 +86,20 @@ export function TaskCard({
           <div className="task-url">{task.url}</div>
         </div>
 
+        {isActive && <Sparkline data={history} />}
+
         <span
           className="badge"
-          style={{
-            background: `${STATUS_COLOR[task.status]}22`,
-            color: STATUS_COLOR[task.status],
-          }}
+          style={{ background: `${STATUS_COLOR[task.status]}22`, color: STATUS_COLOR[task.status] }}
         >
           {STATUS_LABEL[task.status]}
         </span>
+
+        {!task.resumable && isActive && (
+          <span className="badge warn" title="服务端不支持 Range 请求，暂停后会重新下载">
+            不可续传
+          </span>
+        )}
 
         <div className="task-actions">
           {isPausable && (
@@ -66,7 +108,11 @@ export function TaskCard({
             </button>
           )}
           {isResumable && (
-            <button className="btn btn-icon" onClick={() => onResume(task.id)} title="继续">
+            <button
+              className="btn btn-icon"
+              onClick={() => onResume(task.id)}
+              title={task.status === "failed" ? "重试" : "继续"}
+            >
               ▶
             </button>
           )}
@@ -85,6 +131,9 @@ export function TaskCard({
               📁
             </button>
           )}
+          <button className="btn btn-icon" onClick={copyUrl} title="复制链接">
+            🔗
+          </button>
           <button
             className="btn btn-icon btn-danger"
             onClick={() => onRemove(task.id)}
@@ -103,9 +152,8 @@ export function TaskCard({
         {task.segments.length > 1 && (
           <div className="segments">
             {task.segments.map((s) => {
-              const st = s.end >= s.start && s.end !== Number.MAX_SAFE_INTEGER
-                ? s.end - s.start + 1
-                : 0;
+              const st =
+                s.end >= s.start && s.end !== Number.MAX_SAFE_INTEGER ? s.end - s.start + 1 : 0;
               const p = st > 0 ? Math.min((s.downloaded / st) * 100, 100) : 0;
               return (
                 <div className="seg" key={s.index} title={`分片 ${s.index + 1}`}>
@@ -124,6 +172,7 @@ export function TaskCard({
           <span>
             {pct.toFixed(1)}%
             {task.connections > 1 && ` · ${task.connections} 连接`}
+            {task.speed_limit > 0 && ` · 限速 ${formatBytes(task.speed_limit)}/s`}
           </span>
           {isActive && <span>{formatSpeed(speed)}</span>}
           {isActive && <span>剩余 {formatEta(eta ? Math.round(eta) : null)}</span>}

@@ -1,71 +1,79 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, onProgress, onTasks } from "./api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, onNewTask, onProgress, onTasks } from "./api";
 import { NewDownloadDialog } from "./components/NewDownloadDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { TaskCard } from "./components/TaskCard";
-import type { DownloadTask, NewTaskRequest, Settings } from "./types";
-import { formatBytes, formatSpeed } from "./types";
+import type { AppInfo, DownloadTask, NewTaskRequest, Settings } from "./types";
+import { DEFAULT_SETTINGS, formatBytes, formatSpeed } from "./types";
 
 type Filter = "all" | "active" | "completed";
-
-const DEFAULT_SETTINGS: Settings = {
-  download_dir: "",
-  connections: 8,
-  speed_limit: 0,
-  max_concurrent: 3,
-  enable_segment: true,
-  segment_threshold: 1024 * 1024,
-};
 
 export default function App() {
   const [tasks, setTasks] = useState<DownloadTask[]>([]);
   const [speeds, setSpeeds] = useState<Record<string, number>>({});
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [clipboardUrl, setClipboardUrl] = useState<string | undefined>();
-
-  // 用于"批量添加"（多行 URL）
-  const speedsRef = useRef(speeds);
-  speedsRef.current = speeds;
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 
   // ── 初始加载 ──
   useEffect(() => {
     (async () => {
       try {
-        const [list, cfg] = await Promise.all([api.listTasks(), api.getSettings()]);
+        const [list, cfg, info] = await Promise.all([
+          api.listTasks(),
+          api.getSettings(),
+          api.getAppInfo(),
+        ]);
         setTasks(list);
-        if (cfg) setSettings(cfg);
+        setAppInfo(info);
+        if (cfg) setSettings({ ...DEFAULT_SETTINGS, ...cfg });
       } catch (e) {
         console.error("初始化失败", e);
       }
     })();
   }, []);
 
+  // ── 主题 ──
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+  }, [settings.theme]);
+
   // ── 事件订阅 ──
   useEffect(() => {
     let un1: (() => void) | undefined;
     let un2: (() => void) | undefined;
+    let un3: (() => void) | undefined;
 
     (async () => {
       un1 = await onTasks((list) => setTasks(list));
       un2 = await onProgress((p) => {
         setSpeeds((s) => ({ ...s, [p.id]: p.speed }));
-        // 同步任务级进度，减少列表刷新延迟
         setTasks((prev) =>
           prev.map((t) =>
             t.id === p.id
-              ? { ...t, downloaded: p.downloaded, total_size: p.total_size || t.total_size, status: p.status, segments: p.segments }
+              ? {
+                  ...t,
+                  downloaded: p.downloaded,
+                  total_size: p.total_size || t.total_size,
+                  status: p.status,
+                  segments: p.segments,
+                }
               : t
           )
         );
       });
+      // 托盘菜单「新建下载」
+      un3 = await onNewTask(() => setShowNew(true));
     })();
 
     return () => {
       un1?.();
       un2?.();
+      un3?.();
     };
   }, []);
 
@@ -91,37 +99,70 @@ export default function App() {
     };
   }, []);
 
-  // ── 操作 ──
-  const startDownload = useCallback(async (req: NewTaskRequest) => {
-    try {
-      await api.startDownload(req);
-      const list = await api.listTasks();
-      setTasks(list);
-    } catch (e) {
-      console.error("创建任务失败", e);
-      alert(`创建任务失败：${e}`);
+  // ── 任务栏进度条 ──
+  useEffect(() => {
+    const active = tasks.filter(
+      (t) => t.status === "downloading" || t.status === "connecting" || t.status === "merging"
+    );
+    if (active.length === 0) {
+      api.setProgressBar(null).catch(() => {});
+      return;
     }
-  }, []);
+    const total = active.reduce((s, t) => s + (t.total_size || 0), 0);
+    const done = active.reduce((s, t) => s + t.downloaded, 0);
+    api.setProgressBar(total > 0 ? done / total : null).catch(() => {});
+  }, [tasks]);
 
-  const pause = useCallback(async (id: string) => {
-    await api.pauseTask(id);
+  // ── 操作 ──
+  const refresh = useCallback(async () => {
     setTasks(await api.listTasks());
   }, []);
 
-  const resume = useCallback(async (id: string) => {
-    await api.resumeTask(id);
-    setTasks(await api.listTasks());
-  }, []);
+  const startDownloads = useCallback(
+    async (reqs: NewTaskRequest[]) => {
+      for (const r of reqs) {
+        try {
+          await api.startDownload(r);
+        } catch (e) {
+          console.error("创建任务失败", e);
+        }
+      }
+      await refresh();
+    },
+    [refresh]
+  );
 
-  const cancel = useCallback(async (id: string) => {
-    await api.cancelTask(id);
-    setTasks(await api.listTasks());
-  }, []);
+  const pause = useCallback(
+    async (id: string) => {
+      await api.pauseTask(id);
+      await refresh();
+    },
+    [refresh]
+  );
 
-  const remove = useCallback(async (id: string) => {
-    await api.removeTask(id, false);
-    setTasks(await api.listTasks());
-  }, []);
+  const resume = useCallback(
+    async (id: string) => {
+      await api.resumeTask(id);
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const cancel = useCallback(
+    async (id: string) => {
+      await api.cancelTask(id);
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      await api.removeTask(id, false);
+      await refresh();
+    },
+    [refresh]
+  );
 
   const openFile = useCallback(async (task: DownloadTask) => {
     try {
@@ -139,6 +180,16 @@ export default function App() {
     }
   }, []);
 
+  const pauseAll = useCallback(async () => {
+    await api.pauseAll();
+    await refresh();
+  }, [refresh]);
+
+  const resumeAll = useCallback(async () => {
+    await api.resumeAll();
+    await refresh();
+  }, [refresh]);
+
   // ── 统计 ──
   const stats = useMemo(() => {
     const active = tasks.filter(
@@ -147,15 +198,26 @@ export default function App() {
     const totalSpeed = active.reduce((sum, t) => sum + (speeds[t.id] ?? 0), 0);
     const done = tasks.filter((t) => t.status === "completed");
     const doneBytes = done.reduce((sum, t) => sum + t.downloaded, 0);
-    return { activeCount: active.length, totalSpeed, doneCount: done.length, doneBytes };
+    const paused = tasks.filter((t) => t.status === "paused" || t.status === "failed");
+    return {
+      activeCount: active.length,
+      totalSpeed,
+      doneCount: done.length,
+      doneBytes,
+      pausedCount: paused.length,
+    };
   }, [tasks, speeds]);
 
   const filtered = useMemo(() => {
+    let list = tasks;
     if (filter === "active")
-      return tasks.filter((t) => t.status !== "completed" && t.status !== "cancelled");
-    if (filter === "completed") return tasks.filter((t) => t.status === "completed");
-    return tasks;
-  }, [tasks, filter]);
+      list = list.filter((t) => t.status !== "completed" && t.status !== "cancelled");
+    else if (filter === "completed") list = list.filter((t) => t.status === "completed");
+
+    const q = query.trim().toLowerCase();
+    if (q) list = list.filter((t) => t.filename.toLowerCase().includes(q) || t.url.toLowerCase().includes(q));
+    return list;
+  }, [tasks, filter, query]);
 
   return (
     <div className="app">
@@ -177,30 +239,31 @@ export default function App() {
           ))}
         </div>
 
+        <input
+          className="search"
+          value={query}
+          placeholder="搜索文件名或链接"
+          onChange={(e) => setQuery(e.target.value)}
+        />
+
+        <button className="btn" onClick={pauseAll} disabled={stats.activeCount === 0} title="暂停全部">
+          ⏸ 全部暂停
+        </button>
+        <button className="btn" onClick={resumeAll} disabled={stats.pausedCount === 0} title="恢复全部">
+          ▶ 全部继续
+        </button>
         <button className="btn btn-primary" onClick={() => setShowNew(true)}>
           + 新建下载
         </button>
         <button className="btn" onClick={() => setShowSettings(true)}>
-          ⚙ 设置
+          ⚙
         </button>
       </div>
 
       {clipboardUrl && (
-        <div
-          style={{
-            padding: "8px 16px",
-            background: "rgba(88,166,255,0.1)",
-            borderBottom: "1px solid var(--border)",
-            fontSize: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <span style={{ color: "var(--text-dim)" }}>检测到剪贴板链接：</span>
-          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {clipboardUrl}
-          </span>
+        <div className="clipboard-bar">
+          <span className="dim">检测到剪贴板链接：</span>
+          <span className="ellipsis">{clipboardUrl}</span>
           <button className="btn btn-icon" onClick={() => setShowNew(true)}>
             下载
           </button>
@@ -214,9 +277,9 @@ export default function App() {
         {filtered.length === 0 ? (
           <div className="empty">
             <div className="empty-icon">⬇</div>
-            <div>还没有下载任务</div>
+            <div>{query ? "没有匹配的任务" : "还没有下载任务"}</div>
             <div style={{ marginTop: 8, fontSize: 12 }}>
-              点击右上角「新建下载」开始，或复制链接后自动识别
+              点击右上角「新建下载」开始，可一次粘贴多个链接；复制链接后也会自动识别
             </div>
           </div>
         ) : (
@@ -249,13 +312,19 @@ export default function App() {
           已完成 <b>{stats.doneCount}</b> 个 · <b>{formatBytes(stats.doneBytes)}</b>
         </span>
         <span style={{ flex: 1 }} />
-        <span>连接数 {settings.connections} · 并发上限 {settings.max_concurrent}</span>
+        <span>
+          连接数 {settings.connections} · 并发上限 {settings.max_concurrent}
+          {settings.speed_limit > 0 && ` · 限速 ${formatBytes(settings.speed_limit)}/s`}
+          {settings.proxy_mode === "none" && " · 直连"}
+          {settings.proxy_mode === "custom" && " · 自定义代理"}
+          {appInfo && ` · v${appInfo.version}`}
+        </span>
         {tasks.some((t) => t.status === "completed") && (
           <button
             className="btn btn-icon"
             onClick={async () => {
               await api.clearCompleted();
-              setTasks(await api.listTasks());
+              await refresh();
             }}
           >
             清空已完成
@@ -268,7 +337,7 @@ export default function App() {
           settings={settings}
           defaultUrl={clipboardUrl}
           onClose={() => setShowNew(false)}
-          onSubmit={startDownload}
+          onSubmit={startDownloads}
         />
       )}
 

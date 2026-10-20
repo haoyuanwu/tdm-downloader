@@ -82,6 +82,76 @@ impl SegmentProgress {
     }
 }
 
+/// 代理模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProxyMode {
+    /// 跟随 Windows 系统代理（读注册表）
+    System,
+    /// 直连，不使用任何代理（含忽略环境变量）
+    None,
+    /// 自定义代理，proxy_addr 形如 http://127.0.0.1:8080 或 127.0.0.1:8080
+    Custom,
+}
+
+impl Default for ProxyMode {
+    fn default() -> Self {
+        ProxyMode::System
+    }
+}
+
+/// 目标文件已存在时的处理方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FileExistsAction {
+    /// 自动重命名：file.zip → file (1).zip
+    Rename,
+    /// 覆盖原文件
+    Overwrite,
+    /// 跳过（不再下载）
+    Skip,
+}
+
+impl Default for FileExistsAction {
+    fn default() -> Self {
+        FileExistsAction::Rename
+    }
+}
+
+/// 全部下载完成后的动作
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AfterFinishAction {
+    /// 什么都不做
+    None,
+    /// 退出程序
+    Quit,
+    /// 关机
+    Shutdown,
+    /// 休眠
+    Sleep,
+}
+
+impl Default for AfterFinishAction {
+    fn default() -> Self {
+        AfterFinishAction::None
+    }
+}
+
+/// 界面主题
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeMode {
+    Dark,
+    Light,
+}
+
+impl Default for ThemeMode {
+    fn default() -> Self {
+        ThemeMode::Dark
+    }
+}
+
 /// 下载任务（前后端通过 IPC 传输的快照）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DownloadTask {
@@ -108,6 +178,15 @@ pub struct DownloadTask {
     pub created_at: i64,
     /// 完成时间戳（毫秒）
     pub finished_at: Option<i64>,
+    /// 该任务使用的 User-Agent（空则回落到全局设置）
+    #[serde(default)]
+    pub user_agent: String,
+    /// 该任务附加的自定义请求头（如 Referer / Cookie）
+    #[serde(default)]
+    pub headers: Vec<(String, String)>,
+    /// 服务端是否支持断点续传（Accept-Ranges）
+    #[serde(default)]
+    pub resumable: bool,
 }
 
 impl DownloadTask {
@@ -118,6 +197,28 @@ impl DownloadTask {
         }
         (self.downloaded as f64 / self.total_size as f64 * 100.0).min(100.0)
     }
+}
+
+/// URL 预解析结果（新建下载对话框中展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProbeInfo {
+    /// 服务端建议的文件名（Content-Disposition），可能为空
+    pub filename: String,
+    /// 文件总字节数，0 表示未知
+    pub total_size: u64,
+    /// 是否支持断点续传（Accept-Ranges）
+    pub accept_ranges: bool,
+    /// 是否可连接
+    pub ok: bool,
+    /// 错误信息
+    pub error: String,
+}
+
+/// 应用信息（关于页展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppInfo {
+    pub version: String,
+    pub exe_path: String,
 }
 
 /// 实时进度事件（高频推送给前端）
@@ -136,20 +237,43 @@ pub struct ProgressEvent {
 
 /// 新建下载任务的请求参数
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct NewTaskRequest {
     pub url: String,
     /// 保存目录
     pub dir: String,
     /// 文件名，为空则自动推断
     pub filename: Option<String>,
-    /// 连接数，默认 8
+    /// 连接数，默认取全局设置
     pub connections: Option<usize>,
     /// 限速 字节/秒，0 不限
     pub speed_limit: Option<u64>,
+    /// 自定义 User-Agent
+    pub user_agent: Option<String>,
+    /// 附加请求头（Referer / Cookie / Authorization ...）
+    pub headers: Option<Vec<(String, String)>>,
+    /// 建任务后先暂停，等待手动开始
+    pub start_paused: Option<bool>,
+}
+
+impl Default for NewTaskRequest {
+    fn default() -> Self {
+        NewTaskRequest {
+            url: String::new(),
+            dir: String::new(),
+            filename: None,
+            connections: None,
+            speed_limit: None,
+            user_agent: None,
+            headers: None,
+            start_paused: None,
+        }
+    }
 }
 
 /// 应用设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
     /// 默认下载目录
     pub download_dir: String,
@@ -163,20 +287,48 @@ pub struct Settings {
     pub enable_segment: bool,
     /// 分段阈值：文件大于该字节数才分段
     pub segment_threshold: u64,
+    /// 代理模式
+    pub proxy_mode: ProxyMode,
+    /// 自定义代理地址（proxy_mode = custom 时生效）
+    pub proxy_addr: String,
+    /// 默认 User-Agent
+    pub user_agent: String,
+    /// 文件已存在时的处理方式
+    pub file_exists: FileExistsAction,
+    /// 全部下载完成后的动作
+    pub after_finish: AfterFinishAction,
+    /// 关闭窗口时最小化到托盘
+    pub close_to_tray: bool,
+    /// 开机自动启动
+    pub autostart: bool,
+    /// 界面主题
+    pub theme: ThemeMode,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        let dir = dirs_default_download();
         Settings {
-            download_dir: dir,
+            download_dir: dirs_default_download(),
             connections: 8,
             speed_limit: 0,
             max_concurrent: 3,
             enable_segment: true,
             segment_threshold: 1024 * 1024, // 1MB
+            proxy_mode: ProxyMode::System,
+            proxy_addr: String::new(),
+            user_agent: engine_default_ua(),
+            file_exists: FileExistsAction::Rename,
+            after_finish: AfterFinishAction::None,
+            close_to_tray: true,
+            autostart: false,
+            theme: ThemeMode::Dark,
         }
     }
+}
+
+/// 与 engine::DEFAULT_UA 保持一致（放在这里避免 models 依赖 engine）
+fn engine_default_ua() -> String {
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TDM-Downloader/0.2".to_string()
 }
 
 /// 默认下载目录：用户 Downloads 文件夹

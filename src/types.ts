@@ -10,6 +10,11 @@ export type TaskStatus =
   | "cancelled"
   | "failed";
 
+export type ProxyMode = "system" | "none" | "custom";
+export type FileExistsAction = "rename" | "overwrite" | "skip";
+export type AfterFinishAction = "none" | "quit" | "shutdown" | "sleep";
+export type ThemeMode = "dark" | "light";
+
 export interface SegmentProgress {
   index: number;
   start: number;
@@ -32,6 +37,9 @@ export interface DownloadTask {
   error: string | null;
   created_at: number;
   finished_at: number | null;
+  user_agent: string;
+  headers: [string, string][];
+  resumable: boolean;
 }
 
 export interface ProgressEvent {
@@ -50,6 +58,9 @@ export interface NewTaskRequest {
   filename?: string | null;
   connections?: number | null;
   speed_limit?: number | null;
+  user_agent?: string | null;
+  headers?: [string, string][] | null;
+  start_paused?: boolean | null;
 }
 
 export interface Settings {
@@ -59,7 +70,47 @@ export interface Settings {
   max_concurrent: number;
   enable_segment: boolean;
   segment_threshold: number;
+  proxy_mode: ProxyMode;
+  proxy_addr: string;
+  user_agent: string;
+  file_exists: FileExistsAction;
+  after_finish: AfterFinishAction;
+  close_to_tray: boolean;
+  autostart: boolean;
+  theme: ThemeMode;
 }
+
+/** URL 预解析结果 */
+export interface ProbeInfo {
+  filename: string;
+  total_size: number;
+  accept_ranges: boolean;
+  ok: boolean;
+  error: string;
+}
+
+export interface AppInfo {
+  version: string;
+  exe_path: string;
+}
+
+/** 默认设置（后端未返回时的兜底） */
+export const DEFAULT_SETTINGS: Settings = {
+  download_dir: "",
+  connections: 8,
+  speed_limit: 0,
+  max_concurrent: 3,
+  enable_segment: true,
+  segment_threshold: 1024 * 1024,
+  proxy_mode: "system",
+  proxy_addr: "",
+  user_agent: "",
+  file_exists: "rename",
+  after_finish: "none",
+  close_to_tray: true,
+  autostart: false,
+  theme: "dark",
+};
 
 export const STATUS_LABEL: Record<TaskStatus, string> = {
   pending: "等待中",

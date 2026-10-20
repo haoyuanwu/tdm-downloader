@@ -1,26 +1,74 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import type { NewTaskRequest, Settings } from "../types";
+import type { NewTaskRequest, ProbeInfo, Settings } from "../types";
 import { formatBytes } from "../types";
 
 interface Props {
   settings: Settings;
   defaultUrl?: string;
   onClose: () => void;
-  onSubmit: (req: NewTaskRequest) => void;
+  onSubmit: (reqs: NewTaskRequest[]) => void;
+}
+
+/** 从多行文本中解析出 URL 列表 */
+function parseUrls(text: string): string[] {
+  return text
+    .split(/[\r\n,]+/)
+    .map((s) => s.trim())
+    .filter((s) => /^https?:\/\/\S+$/i.test(s));
 }
 
 export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: Props) {
-  const [url, setUrl] = useState(defaultUrl ?? "");
+  const [text, setText] = useState(defaultUrl ?? "");
   const [dir, setDir] = useState(settings.download_dir);
   const [filename, setFilename] = useState("");
   const [connections, setConnections] = useState(settings.connections);
-  const [speedLimitKb, setSpeedLimitKb] = useState(settings.speed_limit / 1024);
-  const [busy, setBusy] = useState(false);
+  const [speedLimitKb, setSpeedLimitKb] = useState(0);
+  const [startPaused, setStartPaused] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [userAgent, setUserAgent] = useState("");
+  const [referer, setReferer] = useState("");
+  const [cookie, setCookie] = useState("");
 
+  const [probe, setProbe] = useState<ProbeInfo | null>(null);
+  const [probing, setProbing] = useState(false);
+  const timerRef = useRef<number | undefined>(undefined);
+
+  const urls = parseUrls(text);
+  const single = urls.length === 1;
+
+  // ── URL 预解析（防抖 700ms，只解析第一个链接）──
   useEffect(() => {
-    if (defaultUrl) setUrl(defaultUrl);
-  }, [defaultUrl]);
+    const first = urls[0];
+    if (!first) {
+      setProbe(null);
+      return;
+    }
+    setProbing(true);
+    window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(async () => {
+      try {
+        const headers: [string, string][] = [];
+        if (referer.trim()) headers.push(["Referer", referer.trim()]);
+        if (cookie.trim()) headers.push(["Cookie", cookie.trim()]);
+        const info = await api.probeUrl(
+          first,
+          userAgent.trim() || undefined,
+          headers.length ? headers : undefined
+        );
+        setProbe(info);
+        // 服务端给出文件名且用户未手填时，自动填入
+        if (info.ok && info.filename && !filename.trim()) {
+          setFilename(info.filename);
+        }
+      } catch {
+        setProbe(null);
+      } finally {
+        setProbing(false);
+      }
+    }, 700);
+    return () => window.clearTimeout(timerRef.current);
+  }, [text, userAgent, referer, cookie, filename, urls]);
 
   const pickDir = async () => {
     try {
@@ -31,23 +79,38 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
     }
   };
 
-  const submit = async () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    setBusy(true);
-    try {
-      onSubmit({
-        url: trimmed,
-        dir,
-        filename: filename.trim() || null,
-        connections,
-        speed_limit: Math.max(0, Math.round(speedLimitKb * 1024)),
-      });
-      onClose();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const submit = useCallback(() => {
+    if (urls.length === 0) return;
+    const headers: [string, string][] = [];
+    if (referer.trim()) headers.push(["Referer", referer.trim()]);
+    if (cookie.trim()) headers.push(["Cookie", cookie.trim()]);
+
+    const reqs: NewTaskRequest[] = urls.map((u) => ({
+      url: u,
+      dir,
+      filename: single ? filename.trim() || null : null,
+      connections,
+      speed_limit: Math.max(0, Math.round(speedLimitKb * 1024)),
+      user_agent: userAgent.trim() || null,
+      headers: headers.length ? headers : null,
+      start_paused: startPaused,
+    }));
+    onSubmit(reqs);
+    onClose();
+  }, [
+    urls,
+    dir,
+    filename,
+    single,
+    connections,
+    speedLimitKb,
+    userAgent,
+    referer,
+    cookie,
+    startPaused,
+    onSubmit,
+    onClose,
+  ]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -55,18 +118,43 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
         <h2>新建下载任务</h2>
 
         <div className="field">
-          <label>下载链接 URL</label>
-          <input
-            type="text"
-            value={url}
+          <label>下载链接（每行一个，可一次粘贴多个）</label>
+          <textarea
+            className="url-area"
+            value={text}
             autoFocus
-            placeholder="https://example.com/file.zip"
-            onChange={(e) => setUrl(e.target.value)}
+            rows={3}
+            placeholder={"https://example.com/file.zip\nhttps://example.com/other.iso"}
+            onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
             }}
           />
+          {urls.length > 1 && (
+            <div className="hint">将创建 {urls.length} 个下载任务</div>
+          )}
         </div>
+
+        {single && (
+          <div className={`probe-box ${probe && !probe.ok ? "error" : ""}`}>
+            {probing && <span className="hint">解析中…</span>}
+            {!probing && probe?.ok && (
+              <>
+                <span className="tag">可下载</span>
+                <span>{probe.filename || "（未获取到文件名）"}</span>
+                <span className="dim">
+                  {probe.total_size > 0 ? formatBytes(probe.total_size) : "大小未知"}
+                </span>
+                <span className={`tag ${probe.accept_ranges ? "ok" : "warn"}`}>
+                  {probe.accept_ranges ? "支持断点续传" : "不支持续传"}
+                </span>
+              </>
+            )}
+            {!probing && probe && !probe.ok && (
+              <span>无法连接：{probe.error}</span>
+            )}
+          </div>
+        )}
 
         <div className="field">
           <label>保存到</label>
@@ -84,11 +172,12 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
         </div>
 
         <div className="field">
-          <label>文件名（留空自动从 URL 推断）</label>
+          <label>文件名（留空自动推断）</label>
           <input
             type="text"
             value={filename}
-            placeholder="自动推断"
+            placeholder={single ? "自动推断" : "批量下载时逐个自动推断"}
+            disabled={!single}
             onChange={(e) => setFilename(e.target.value)}
           />
         </div>
@@ -115,17 +204,66 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-          默认下载目录：{settings.download_dir}
-          {settings.speed_limit > 0 && ` · 全局限速 ${formatBytes(settings.speed_limit)}/s`}
+        <div className="checkbox-row" onClick={() => setShowAdvanced((v) => !v)}>
+          <span className="link">{showAdvanced ? "▾" : "▸"} 高级选项</span>
         </div>
 
+        {showAdvanced && (
+          <div className="advanced">
+            <div className="field">
+              <label>User-Agent（留空使用全局设置）</label>
+              <input
+                type="text"
+                value={userAgent}
+                placeholder={settings.user_agent || "默认"}
+                onChange={(e) => setUserAgent(e.target.value)}
+              />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Referer</label>
+                <input
+                  type="text"
+                  value={referer}
+                  placeholder="https://"
+                  onChange={(e) => setReferer(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Cookie</label>
+                <input
+                  type="text"
+                  value={cookie}
+                  placeholder="name=value; ..."
+                  onChange={(e) => setCookie(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="checkbox-row">
+              <input
+                type="checkbox"
+                id="start_paused"
+                checked={startPaused}
+                onChange={(e) => setStartPaused(e.target.checked)}
+              />
+              <label htmlFor="start_paused" style={{ margin: 0 }}>
+                仅添加到列表，稍后手动开始
+              </label>
+            </div>
+          </div>
+        )}
+
         <div className="modal-footer">
-          <button className="btn" onClick={onClose} disabled={busy}>
+          <button className="btn" onClick={onClose}>
             取消
           </button>
-          <button className="btn btn-primary" onClick={submit} disabled={busy || !url.trim()}>
-            开始下载
+          <button
+            className="btn btn-primary"
+            onClick={submit}
+            disabled={urls.length === 0}
+          >
+            {startPaused ? "添加到列表" : "开始下载"}
+            {urls.length > 1 ? ` (${urls.length})` : ""}
           </button>
         </div>
       </div>
