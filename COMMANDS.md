@@ -205,7 +205,7 @@ npm install && npm run tauri dev
 
 ```bash
 gh release create v0.2.0 \
-  --title "TDM Downloader v0.2.0" \
+  --title "v0.2.0" \
   --notes-file notes.md \
   --latest \
   release/0.2.0_x64-setup.exe \
@@ -213,6 +213,13 @@ gh release create v0.2.0 \
 ```
 
 > 注意：附件名取自你传的文件名，所以文件名改成什么样，Release 里就显示什么样。
+> 标题**只用纯版本号**（`v0.2.0`），不要写成 `TDM Downloader v0.2.0`——Release 列表里前面已经有仓库名，带产品名会重复且冗长。
+>
+> 已发布的历史 Release 要改标题：
+>
+> ```bash
+> gh release edit v0.2.0 --title "v0.2.0"
+> ```
 
 ---
 
