@@ -6,6 +6,14 @@
 
 > 功能对标同类下载工具，但**代码与界面完全自研**，不含任何第三方软件的源码或素材。
 
+**下载**（当前版本 v0.2.2）：
+
+- 安装包（3.3 MB，推荐）：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe>
+- 免安装版（14.8 MB）：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe>
+- 全部版本：<https://github.com/haoyuanwu/tdm-downloader/releases>
+
+> 仓库目前是私有的，链接需要登录 GitHub 账号后访问。
+
 ---
 
 ## 一、它能做什么
@@ -63,17 +71,27 @@
 
 ### 方式 A：安装包（推荐）
 
+- 安装包：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe>
+- 全部历史版本：<https://github.com/haoyuanwu/tdm-downloader/releases>
+
 下载 `0.2.2_x64-setup.exe`，双击一路下一步。
 
 - 约 3 MB，安装到当前用户目录，**不需要管理员权限**
 - 自动创建开始菜单快捷方式和卸载入口
 - 安装界面为简体中文
 
+SHA256：`78a0790779b1ea73022ce2a9cdc742c3d660691509ddcc24f96d51608f309201`
+
 > 文件名就是版本号，便于一眼分辨；始终想拿最新版用 `latest_x64-setup.exe`。
+> 仓库目前是**私有**的，下载链接需要登录 GitHub 账号后才能访问。
 
 ### 方式 B：免安装版
 
+- 便携版：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe>
+
 下载 `0.2.2_x64_portable.exe`（约 15 MB），放到任意目录直接双击运行。适合放 U 盘随身带。
+
+SHA256：`406a7b25e229027391d269fea6c391d34c2cebf8b28f97e43841098d7d4f012a`
 
 ### 方式 C：从源码构建
 
