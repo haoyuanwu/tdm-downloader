@@ -5,6 +5,8 @@
 
 一个用 **Tauri 2 + Rust** 构建的多线程下载管理器。macOS 下载、构建和发布说明见 [MACOS.md](MACOS.md)。
 
+下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.3/TDM-Downloader_0.2.3_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.3/TDM-Downloader_0.2.3_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
+
 功能对标 TDM Fast（已通过 REA 逆向分析其实现），但**代码与 UI 完全自研**，
 不复制原软件的任何代码、文案或图标。
 

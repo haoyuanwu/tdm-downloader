@@ -1,15 +1,16 @@
 # TDM Downloader 软件介绍
 
-一款为 Windows 打造的**多线程下载管理器**。体积不到 15 MB，不用装浏览器、不用装运行时，双击就能跑。
+一款适用于 macOS 和 Windows 的**多线程下载管理器**。安装包体积小，不用安装浏览器扩展即可使用。
 
 它的设计目标很单纯：**把大文件又快又稳地拉下来**——速度快、断了能续、限速可控、出问题自己重连。
 
 > 功能对标同类下载工具，但**代码与界面完全自研**，不含任何第三方软件的源码或素材。
 
-**下载**（当前版本 v0.2.2）：
+**下载**：
 
-- 安装包（3.3 MB，推荐）：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe>
-- 免安装版（14.8 MB）：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe>
+- macOS v0.2.3 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.3/TDM-Downloader_0.2.3_macos_arm64.dmg)
+- macOS v0.2.3 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.3/TDM-Downloader_0.2.3_macos_x86_64.dmg)
+- Windows v0.2.2 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe)
 - 全部版本：<https://github.com/haoyuanwu/tdm-downloader/releases>
 
 > 仓库目前是私有的，链接需要登录 GitHub 账号后访问。
@@ -69,7 +70,11 @@
 
 ## 三、安装
 
-### 方式 A：安装包（推荐）
+### macOS：DMG
+
+按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.3/TDM-Downloader_0.2.3_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.3/TDM-Downloader_0.2.3_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹。应用尚未经过 Apple 签名和公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
+
+### Windows 方式 A：安装包（推荐）
 
 - 安装包：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe>
 - 全部历史版本：<https://github.com/haoyuanwu/tdm-downloader/releases>
@@ -85,7 +90,7 @@ SHA256：`78a0790779b1ea73022ce2a9cdc742c3d660691509ddcc24f96d51608f309201`
 > 文件名就是版本号，便于一眼分辨；始终想拿最新版用 `latest_x64-setup.exe`。
 > 仓库目前是**私有**的，下载链接需要登录 GitHub 账号后才能访问。
 
-### 方式 B：免安装版
+### Windows 方式 B：免安装版
 
 - 便携版：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe>
 
@@ -93,7 +98,7 @@ SHA256：`78a0790779b1ea73022ce2a9cdc742c3d660691509ddcc24f96d51608f309201`
 
 SHA256：`406a7b25e229027391d269fea6c391d34c2cebf8b28f97e43841098d7d4f012a`
 
-### 方式 C：从源码构建
+### Windows 方式 C：从源码构建
 
 需要 Rust 1.99+、Node.js 22+、WebView2 Runtime、Visual Studio C++ 生成工具：
 
@@ -161,6 +166,7 @@ npm run package        # 产物输出到 release/，文件名即版本号
 
 ## 七、系统要求
 
+- macOS 12 或更高版本，Apple 芯片或 Intel 芯片
 - Windows 10 / 11，x64
 - WebView2 Runtime（Win10 21H2 以上和 Win11 通常已自带，缺失时会提示下载）
 
