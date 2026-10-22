@@ -24,7 +24,7 @@ use tauri::Emitter;
 use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinHandle;
 
-pub const DEFAULT_UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TDM-Downloader/0.1";
+pub const DEFAULT_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15 TDM-Downloader/0.2";
 
 /// 进度事件名（前端订阅）
 pub const EVT_PROGRESS: &str = "download://progress";
@@ -79,6 +79,50 @@ fn windows_system_proxy() -> Option<(String, Option<String>)> {
     }
     let bypass: Option<String> = key.get_value("ProxyOverride").ok();
     Some((server, bypass))
+}
+
+/// Read the effective macOS network proxy settings for the current location.
+#[cfg(target_os = "macos")]
+fn macos_system_proxy() -> Option<(String, Option<String>)> {
+    let output = std::process::Command::new("/usr/sbin/scutil")
+        .arg("--proxy")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let lines = String::from_utf8(output.stdout).ok()?;
+    let value = |key: &str| -> Option<String> {
+        lines.lines().find_map(|line| {
+            let (name, val) = line.trim().split_once(" : ")?;
+            (name == key).then(|| val.trim().to_string())
+        })
+    };
+    let prefix = if value("HTTPSEnable").as_deref() == Some("1") {
+        "HTTPS"
+    } else if value("HTTPEnable").as_deref() == Some("1") {
+        "HTTP"
+    } else {
+        return None;
+    };
+    let host = value(&format!("{prefix}Proxy"))?;
+    let port = value(&format!("{prefix}Port"))?;
+    if host.is_empty() || port.parse::<u16>().is_err() {
+        return None;
+    }
+    let bypass = lines
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            let (index, val) = line.split_once(" : ")?;
+            (index.parse::<usize>().is_ok()).then_some(val.trim().to_string())
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    Some((
+        format!("http://{host}:{port}"),
+        (!bypass.is_empty()).then_some(bypass),
+    ))
 }
 
 /// 把形如 "127.0.0.1:6864" / "http=a:1;https=b:2" / "http://a:1" 归一化为带 scheme 的代理 URL
@@ -202,11 +246,11 @@ pub fn build_task_client(cfg: &ClientConfig) -> reqwest::Client {
                             if let Some(url) = normalize_proxy_addr(&addr) {
                                 if let Ok(p) = reqwest::Proxy::all(&url) {
                                     let p = match bypass {
-                                        Some(b) if !b.trim().is_empty() => p.no_proxy(
-                                            reqwest::NoProxy::from_string(
+                                        Some(b) if !b.trim().is_empty() => {
+                                            p.no_proxy(reqwest::NoProxy::from_string(
                                                 &b.replace(';', ",").replace("<local>", ""),
-                                            ),
-                                        ),
+                                            ))
+                                        }
                                         _ => p,
                                     };
                                     builder = builder.proxy(p);
@@ -220,16 +264,28 @@ pub fn build_task_client(cfg: &ClientConfig) -> reqwest::Client {
                     }
                 }
             }
-            #[cfg(not(windows))]
+            #[cfg(target_os = "macos")]
             {
-                // 非 Windows 沿用 reqwest 默认（环境变量）
+                if let Some((addr, bypass)) = macos_system_proxy() {
+                    if let Ok(p) = reqwest::Proxy::all(&addr) {
+                        let p = match bypass {
+                            Some(b) => p.no_proxy(reqwest::NoProxy::from_string(&b)),
+                            None => p,
+                        };
+                        builder = builder.proxy(p);
+                    }
+                } else {
+                    builder = builder.no_proxy();
+                }
+            }
+            #[cfg(not(any(windows, target_os = "macos")))]
+            {
+                // Other platforms use reqwest's environment defaults.
             }
         }
     }
 
-    builder
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new())
+    builder.build().unwrap_or_else(|_| reqwest::Client::new())
 }
 
 // ────────────────────────── 限速器 ──────────────────────────
@@ -408,6 +464,11 @@ fn load_state(save_path: &str) -> Option<PersistedState> {
 // ────────────────────────── 设置持久化 ──────────────────────────
 
 fn settings_file() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    let base = std::env::var("HOME")
+        .map(|home| PathBuf::from(home).join("Library/Application Support"))
+        .unwrap_or_else(|_| PathBuf::from("."));
+    #[cfg(not(target_os = "macos"))]
     let base = std::env::var("LOCALAPPDATA")
         .or_else(|_| std::env::var("APPDATA"))
         .map(PathBuf::from)
@@ -650,16 +711,7 @@ pub async fn download_segment(
         }
 
         match download_segment_once(
-            &client,
-            &url,
-            &part,
-            seg_index,
-            start,
-            end,
-            unbounded,
-            &task,
-            &cancel,
-            &pause,
+            &client, &url, &part, seg_index, start, end, unbounded, &task, &cancel, &pause,
             &limiter,
         )
         .await
@@ -753,8 +805,7 @@ async fn download_segment_once(
     {
         return SegOutcome::Error(format!("分片 {} 被限流 HTTP {}", seg_index, status));
     }
-    let status_ok =
-        status == reqwest::StatusCode::PARTIAL_CONTENT || status.is_success();
+    let status_ok = status == reqwest::StatusCode::PARTIAL_CONTENT || status.is_success();
     if !status_ok {
         return SegOutcome::Error(format!("分片 {} HTTP {}", seg_index, status));
     }
@@ -833,7 +884,11 @@ async fn download_segment_once(
 // ────────────────────────── 任务主流程 ──────────────────────────
 
 /// 构建分片（新建或按已有状态续传）
-pub fn build_segments(total_size: u64, connections: usize, prev: &[SegmentProgress]) -> Vec<SegmentProgress> {
+pub fn build_segments(
+    total_size: u64,
+    connections: usize,
+    prev: &[SegmentProgress],
+) -> Vec<SegmentProgress> {
     if total_size == 0 {
         return vec![SegmentProgress {
             index: 0,
@@ -891,7 +946,8 @@ pub fn merge_parts(save_path: &str, count: usize) -> Result<(), String> {
         let p = part_path(save_path, i);
         if p.exists() {
             let data = fs::read(&p).map_err(|e| format!("读取分片失败: {}", e))?;
-            out.write_all(&data).map_err(|e| format!("写入合并失败: {}", e))?;
+            out.write_all(&data)
+                .map_err(|e| format!("写入合并失败: {}", e))?;
         }
     }
     out.flush().map_err(|e| format!("flush 失败: {}", e))?;
@@ -905,11 +961,7 @@ pub fn merge_parts(save_path: &str, count: usize) -> Result<(), String> {
 }
 
 /// 任务主循环（一次"运行"：从当前进度跑到 暂停/完成/取消/失败）
-pub async fn run_task(
-    app: tauri::AppHandle,
-    engine: Arc<DownloadEngine>,
-    handle: TaskHandle,
-) {
+pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle: TaskHandle) {
     let id = {
         let t = handle.task.lock().await;
         t.id.clone()
@@ -1032,9 +1084,15 @@ pub async fn run_task(
             }
         }
         t.resumable = accept_ranges;
-        let dir = Path::new(&t.save_path).parent().unwrap_or(Path::new(".")).to_path_buf();
+        let dir = Path::new(&t.save_path)
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf();
         let _ = fs::create_dir_all(&dir);
-        let action = { let s = engine.settings.lock().await; s.file_exists };
+        let action = {
+            let s = engine.settings.lock().await;
+            s.file_exists
+        };
         let direct = dir.join(&t.filename);
         let (full, skip) = match action {
             FileExistsAction::Overwrite => (direct, false),
@@ -1077,7 +1135,9 @@ pub async fn run_task(
     {
         let settings = engine.settings.lock().await;
         let mut t = handle.task.lock().await;
-        let prev = load_state(&save_path).map(|s| s.segments).unwrap_or_default();
+        let prev = load_state(&save_path)
+            .map(|s| s.segments)
+            .unwrap_or_default();
         let use_segment = settings.enable_segment
             && !unbounded
             && accept_ranges
@@ -1117,8 +1177,17 @@ pub async fn run_task(
         let unbounded_c = unbounded;
         futs.push(tokio::spawn(async move {
             download_segment(
-                client, url_c, part, idx, start, end, unbounded_c, task_c,
-                cancel_c, pause_c, limiter_c,
+                client,
+                url_c,
+                part,
+                idx,
+                start,
+                end,
+                unbounded_c,
+                task_c,
+                cancel_c,
+                pause_c,
+                limiter_c,
             )
             .await
         }));
@@ -1237,13 +1306,19 @@ pub async fn maybe_run_after_finish(app: &tauri::AppHandle, engine: &Arc<Downloa
     }
 }
 
-/// 执行系统关机 / 休眠（Windows）
+/// 执行系统关机 / 休眠
 fn system_power(shutdown: bool) -> Result<(), String> {
     #[cfg(windows)]
     {
         if shutdown {
             std::process::Command::new("shutdown")
-                .args(["/s", "/t", "30", "/c", "TDM Downloader: all downloads finished."])
+                .args([
+                    "/s",
+                    "/t",
+                    "30",
+                    "/c",
+                    "TDM Downloader: all downloads finished.",
+                ])
                 .spawn()
                 .map(|_| ())
                 .map_err(|e| e.to_string())
@@ -1255,7 +1330,28 @@ fn system_power(shutdown: bool) -> Result<(), String> {
                 .map_err(|e| e.to_string())
         }
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        if shutdown {
+            std::process::Command::new("osascript")
+                .args([
+                    "-e",
+                    "delay 30",
+                    "-e",
+                    "tell application \"System Events\" to shut down",
+                ])
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        } else {
+            std::process::Command::new("pmset")
+                .arg("sleepnow")
+                .spawn()
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        }
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = shutdown;
         Err("当前平台不支持该操作".to_string())
@@ -1348,7 +1444,9 @@ pub async fn resume_task(
 ) -> Result<(), String> {
     let handle = {
         let map = engine.tasks.lock().await;
-        map.get(id).cloned().ok_or_else(|| "任务不存在".to_string())?
+        map.get(id)
+            .cloned()
+            .ok_or_else(|| "任务不存在".to_string())?
     };
     {
         let mut t = handle.task.lock().await;
@@ -1388,9 +1486,7 @@ pub async fn resume_all(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>) {
     let ids: Vec<String> = {
         let list = engine.snapshot().await;
         list.into_iter()
-            .filter(|t| {
-                t.status == TaskStatus::Paused || t.status == TaskStatus::Failed
-            })
+            .filter(|t| t.status == TaskStatus::Paused || t.status == TaskStatus::Failed)
             .map(|t| t.id)
             .collect()
     };
@@ -1411,7 +1507,11 @@ pub async fn cancel_task(engine: &Arc<DownloadEngine>, id: &str) -> Result<(), S
 }
 
 /// 删除任务（并清理分片/状态文件，可选同时删除已下载文件）
-pub async fn remove_task(engine: &Arc<DownloadEngine>, id: &str, delete_file: bool) -> Result<(), String> {
+pub async fn remove_task(
+    engine: &Arc<DownloadEngine>,
+    id: &str,
+    delete_file: bool,
+) -> Result<(), String> {
     let handle = {
         let mut map = engine.tasks.lock().await;
         map.remove(id).ok_or_else(|| "任务不存在".to_string())?
@@ -1494,7 +1594,8 @@ mod tests {
                     let body = if is_head {
                         Vec::new()
                     } else {
-                        data[start as usize..=(end as usize).min(data.len().saturating_sub(1))].to_vec()
+                        data[start as usize..=(end as usize).min(data.len().saturating_sub(1))]
+                            .to_vec()
                     };
 
                     let mut resp = format!(
@@ -1620,7 +1721,11 @@ mod tests {
         let seg_total_1 = task.segments[1].total();
         task.segments[0].downloaded = seg_total_0 * 40 / 100;
         task.segments[1].downloaded = seg_total_1 * 10 / 100;
-        fs::write(part_path(&save_str, 0), &data[0..task.segments[0].downloaded as usize]).unwrap();
+        fs::write(
+            part_path(&save_str, 0),
+            &data[0..task.segments[0].downloaded as usize],
+        )
+        .unwrap();
         fs::write(
             part_path(&save_str, 1),
             &data[task.segments[1].start as usize

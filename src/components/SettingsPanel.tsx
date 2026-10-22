@@ -211,7 +211,7 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             </div>
             <div className="hint">
               {form.proxy_mode === "system"
-                ? "跟随 Windows「Internet 选项」中的代理设置"
+                ? "跟随 macOS 网络设置中的代理；PAC 自动配置请使用自定义代理地址"
                 : form.proxy_mode === "none"
                 ? "直连，同时忽略 HTTP_PROXY 等环境变量"
                 : "使用下方手动填写的代理"}

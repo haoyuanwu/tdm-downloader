@@ -86,7 +86,7 @@ impl SegmentProgress {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProxyMode {
-    /// 跟随 Windows 系统代理（读注册表）
+    /// 跟随系统代理
     System,
     /// 直连，不使用任何代理（含忽略环境变量）
     None,
@@ -328,7 +328,7 @@ impl Default for Settings {
 
 /// 与 engine::DEFAULT_UA 保持一致（放在这里避免 models 依赖 engine）
 fn engine_default_ua() -> String {
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TDM-Downloader/0.2".to_string()
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15 TDM-Downloader/0.2".to_string()
 }
 
 /// 默认下载目录：用户 Downloads 文件夹

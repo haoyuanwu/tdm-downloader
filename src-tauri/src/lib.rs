@@ -2,6 +2,7 @@
 //!
 //! 功能对标 TDM Fast（已逆向分析），但代码与 UI 完全自研。
 
+mod clipboard;
 pub mod engine;
 pub mod models;
 
@@ -12,6 +13,20 @@ use tauri::{Emitter, Manager};
 
 /// 托盘「新建下载」通知前端的事件名
 pub const EVT_NEW_TASK: &str = "tdm://new-task";
+pub const EVT_QUICK_OPEN: &str = "tdm://quick-open";
+
+#[derive(Default)]
+struct ClipboardState(std::sync::Mutex<Option<clipboard::ClipboardCandidate>>);
+
+#[derive(Clone, serde::Serialize, Default)]
+struct QuickOpenPayload {
+    mode: String,
+    url: Option<String>,
+    filename: Option<String>,
+}
+
+#[derive(Default)]
+struct QuickWindowState(std::sync::Mutex<QuickOpenPayload>);
 
 /// 新建下载任务
 #[tauri::command]
@@ -22,6 +37,16 @@ async fn start_download(
 ) -> Result<DownloadTask, String> {
     let engine = Arc::clone(&state);
     let task = engine::spawn_task(app.clone(), engine.clone(), req).await?;
+    let should_clear = app
+        .state::<ClipboardState>()
+        .0
+        .lock()
+        .ok()
+        .and_then(|candidate| candidate.as_ref().map(|c| c.url == task.url))
+        .unwrap_or(false);
+    if should_clear {
+        clear_clipboard_candidate(&app);
+    }
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(task)
@@ -29,7 +54,9 @@ async fn start_download(
 
 /// 列出所有任务
 #[tauri::command]
-async fn list_tasks(state: tauri::State<'_, Arc<DownloadEngine>>) -> Result<Vec<DownloadTask>, String> {
+async fn list_tasks(
+    state: tauri::State<'_, Arc<DownloadEngine>>,
+) -> Result<Vec<DownloadTask>, String> {
     Ok(state.snapshot().await)
 }
 
@@ -148,9 +175,12 @@ async fn open_download_dir(path: String) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     {
-        let _ = target;
+        std::process::Command::new("open")
+            .arg(target)
+            .spawn()
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -256,6 +286,8 @@ fn set_progress_bar(window: tauri::WebviewWindow, progress: Option<f64>) -> Resu
 /// 显示并聚焦主窗口（托盘菜单用）
 #[tauri::command]
 fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    let _ = hide_quick_window(app.clone());
+    show_dock(&app);
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.unminimize();
         let _ = w.show();
@@ -270,6 +302,52 @@ fn hide_main_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.hide();
     }
+    hide_dock(&app);
+    Ok(())
+}
+
+#[tauri::command]
+async fn quick_clipboard_hint(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    let text = app.clipboard().read_text().ok()?;
+    let candidate = app
+        .state::<ClipboardState>()
+        .0
+        .lock()
+        .ok()
+        .and_then(|c| c.clone());
+    if let Some(candidate) = candidate {
+        if clipboard::clipboard_url(&text).as_deref() == Some(candidate.url.as_str()) {
+            return Some(candidate.url);
+        }
+    }
+    let url = clipboard::clipboard_url(&text)?;
+    clipboard::inspect_url(&app, &url).await.map(|c| c.url)
+}
+
+#[tauri::command]
+fn quick_open_context(app: tauri::AppHandle) -> QuickOpenPayload {
+    app.state::<QuickWindowState>()
+        .0
+        .lock()
+        .map(|state| state.clone())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn hide_quick_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("quick") {
+        w.hide().map_err(|e| e.to_string())?;
+    }
+    let clipboard_mode = app
+        .state::<QuickWindowState>()
+        .0
+        .lock()
+        .map(|current| current.mode == "clipboard")
+        .unwrap_or(false);
+    if clipboard_mode {
+        clear_clipboard_candidate(&app);
+    }
     Ok(())
 }
 
@@ -279,14 +357,33 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-/// 读取 / 设置开机自启（Windows 启动目录）
+/// 读取 / 设置登录时启动
 #[tauri::command]
 fn set_autostart(enabled: bool) -> Result<(), String> {
     let p = autostart_file()?;
     if enabled {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let content = format!("@echo off\r\nstart \"\" \"{}\"\r\n", exe.display());
-        std::fs::write(&p, content).map_err(|e| e.to_string())
+        #[cfg(target_os = "windows")]
+        {
+            let content = format!("@echo off\r\nstart \"\" \"{}\"\r\n", exe.display());
+            return std::fs::write(&p, content).map_err(|e| e.to_string());
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let escaped = exe
+                .to_string_lossy()
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+                .replace('\'', "&apos;");
+            let content = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>com.tdm.downloader</string><key>ProgramArguments</key><array><string>{escaped}</string></array><key>RunAtLoad</key><true/></dict></plist>\n");
+            std::fs::write(&p, content).map_err(|e| e.to_string())?;
+            // Login agents are loaded automatically on the next login.
+            return Ok(());
+        }
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        return Err("当前平台不支持开机自启".to_string());
     } else if p.exists() {
         std::fs::remove_file(&p).map_err(|e| e.to_string())
     } else {
@@ -299,16 +396,28 @@ fn get_autostart() -> bool {
     autostart_file().map(|p| p.exists()).unwrap_or(false)
 }
 
-/// Windows 启动目录脚本路径
+/// 平台对应的登录启动项路径
 fn autostart_file() -> Result<std::path::PathBuf, String> {
-    let appdata = std::env::var("APPDATA").map_err(|_| "未找到 APPDATA 目录".to_string())?;
-    Ok(std::path::PathBuf::from(appdata)
-        .join("Microsoft")
-        .join("Windows")
-        .join("Start Menu")
-        .join("Programs")
-        .join("Startup")
-        .join("TDM Downloader.cmd"))
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").map_err(|_| "未找到 HOME 目录".to_string())?;
+        let dir = std::path::PathBuf::from(home).join("Library/LaunchAgents");
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        return Ok(dir.join("com.tdm.downloader.plist"));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let appdata = std::env::var("APPDATA").map_err(|_| "未找到 APPDATA 目录".to_string())?;
+        return Ok(std::path::PathBuf::from(appdata)
+            .join("Microsoft")
+            .join("Windows")
+            .join("Start Menu")
+            .join("Programs")
+            .join("Startup")
+            .join("TDM Downloader.cmd"));
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    Err("当前平台不支持开机自启".to_string())
 }
 
 /// 应用信息（关于）
@@ -326,9 +435,7 @@ fn get_app_info() -> AppInfo {
 #[tauri::command]
 async fn copy_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
     use tauri_plugin_clipboard_manager::ClipboardExt;
-    app.clipboard()
-        .write_text(text)
-        .map_err(|e| e.to_string())
+    app.clipboard().write_text(text).map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -340,6 +447,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(engine)
+        .manage(ClipboardState::default())
+        .manage(QuickWindowState::default())
         .invoke_handler(tauri::generate_handler![
             start_download,
             list_tasks,
@@ -364,32 +473,58 @@ pub fn run() {
             get_autostart,
             get_app_info,
             copy_text,
+            quick_clipboard_hint,
+            quick_open_context,
+            hide_quick_window,
         ])
         .setup(|app| {
+            tauri::WebviewWindowBuilder::new(
+                app,
+                "quick",
+                tauri::WebviewUrl::App("index.html?quick=1".into()),
+            )
+            .title("快速下载")
+            .inner_size(380.0, 174.0)
+            .resizable(false)
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .visible(false)
+            .build()?;
             build_tray(app)?;
+            tauri::async_runtime::spawn(clipboard::monitor(app.handle().clone()));
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
             // 关闭窗口时按设置最小化到托盘，而不是退出
-            if let tauri::RunEvent::WindowEvent {
-                label,
-                event: tauri::WindowEvent::CloseRequested { api, .. },
-                ..
-            } = event
-            {
-                if label == "main" {
-                    let to_tray = app
-                        .state::<Arc<DownloadEngine>>()
-                        .settings
-                        .try_lock()
-                        .map(|s| s.close_to_tray)
-                        .unwrap_or(true);
-                    if to_tray {
-                        api.prevent_close();
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.hide();
+            if let tauri::RunEvent::WindowEvent { label, event, .. } = event {
+                if label == "quick" {
+                    match event {
+                        tauri::WindowEvent::CloseRequested { api, .. } => {
+                            api.prevent_close();
+                            let _ = hide_quick_window(app.clone());
+                        }
+                        tauri::WindowEvent::Focused(false) => {
+                            let _ = hide_quick_window(app.clone());
+                        }
+                        _ => {}
+                    }
+                } else if label == "main" {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        let to_tray = app
+                            .state::<Arc<DownloadEngine>>()
+                            .settings
+                            .try_lock()
+                            .map(|s| s.close_to_tray)
+                            .unwrap_or(true);
+                        if to_tray {
+                            api.prevent_close();
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.hide();
+                            }
+                            hide_dock(app);
                         }
                     }
                 }
@@ -399,25 +534,15 @@ pub fn run() {
 
 /// 构建系统托盘图标与菜单
 fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
-
-    let show = MenuItemBuilder::with_id("show", "显示主窗口").build(app)?;
-    let new = MenuItemBuilder::with_id("new", "新建下载").build(app)?;
-    let pause = MenuItemBuilder::with_id("pause_all", "暂停全部").build(app)?;
-    let resume = MenuItemBuilder::with_id("resume_all", "恢复全部").build(app)?;
-    let sep = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
-
-    let menu = MenuBuilder::new(app)
-        .items(&[&show, &new, &pause, &resume, &sep, &quit])
-        .build()?;
 
     let handle = app.handle().clone();
     app.on_menu_event(move |app, event| {
         let engine = app.state::<Arc<DownloadEngine>>().inner().clone();
         match event.id().as_ref() {
             "show" => {
+                let _ = hide_quick_window(app.clone());
+                show_dock(app);
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.unminimize();
                     let _ = w.show();
@@ -425,6 +550,8 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "new" => {
+                let _ = hide_quick_window(app.clone());
+                show_dock(app);
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.unminimize();
                     let _ = w.show();
@@ -451,13 +578,14 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some("TDM Downloader"));
-        let _ = tray.set_menu(Some(menu));
+        let _ = tray.set_title(None::<&str>);
+        refresh_tray_menu(app.handle())?;
         // Tauri 默认左键也会弹出托盘菜单（tray-icon 默认 menu_on_left_click = true），
         // 会和「左键切换主窗口」打架：菜单刚弹出就被抢焦点的窗口挤掉。
         // 关掉它，约定：左键 = 显示/隐藏窗口，右键 = 弹出菜单。
         let _ = tray.set_show_menu_on_left_click(false);
         tray.on_tray_icon_event(move |_tray, e| {
-            // 只响应「左键单击抬起」来切换窗口。
+            // 左键打开快速下载窗口；右键保留任务管理菜单。
             // 右键点击由系统弹出托盘菜单，此时绝不能 show/set_focus 主窗口，
             // 否则主窗口会抢走焦点，导致刚弹出的菜单瞬间消失（表现为闪一下就没了）。
             let left_click = matches!(
@@ -479,17 +607,106 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             if !left_click && !left_dbl {
                 return;
             }
-            if let Some(w) = handle.get_webview_window("main") {
-                if w.is_visible().unwrap_or(false) {
-                    let _ = w.hide();
-                } else {
-                    let _ = w.unminimize();
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
-            }
+            toggle_quick_window(&handle);
         });
     }
 
     Ok(())
+}
+
+fn refresh_tray_menu(app: &tauri::AppHandle) -> tauri::Result<()> {
+    use tauri::menu::MenuBuilder;
+
+    let menu = MenuBuilder::new(app)
+        .text("show", "显示主窗口")
+        .text("new", "新建下载")
+        .text("pause_all", "暂停全部")
+        .text("resume_all", "恢复全部")
+        .separator()
+        .text("quit", "退出")
+        .build()?;
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.set_menu(Some(menu))?;
+    }
+    Ok(())
+}
+
+fn show_clipboard_candidate(app: &tauri::AppHandle, candidate: clipboard::ClipboardCandidate) {
+    if let Ok(mut current) = app.state::<ClipboardState>().0.lock() {
+        *current = Some(candidate.clone());
+    }
+    show_quick_window(app, Some(candidate));
+}
+
+fn toggle_quick_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("quick") {
+        if w.is_visible().unwrap_or(false) {
+            let clipboard_mode = app
+                .state::<QuickWindowState>()
+                .0
+                .lock()
+                .map(|current| current.mode == "clipboard")
+                .unwrap_or(false);
+            if clipboard_mode {
+                show_quick_window(app, None);
+            } else {
+                let _ = hide_quick_window(app.clone());
+            }
+        } else {
+            show_quick_window(app, None);
+        }
+    }
+}
+
+fn show_quick_window(app: &tauri::AppHandle, candidate: Option<clipboard::ClipboardCandidate>) {
+    let payload = match candidate {
+        Some(candidate) => QuickOpenPayload {
+            mode: "clipboard".to_string(),
+            url: Some(candidate.url),
+            filename: Some(candidate.filename),
+        },
+        None => QuickOpenPayload {
+            mode: "manual".to_string(),
+            ..Default::default()
+        },
+    };
+    if let Ok(mut current) = app.state::<QuickWindowState>().0.lock() {
+        *current = payload.clone();
+    }
+    let Some(w) = app.get_webview_window("quick") else {
+        return;
+    };
+    if let Some(tray) = app.tray_by_id("main") {
+        if let Ok(Some(rect)) = tray.rect() {
+            let scale = w.scale_factor().unwrap_or(1.0);
+            let position = rect.position.to_physical::<f64>(scale);
+            let size = rect.size.to_physical::<f64>(scale);
+            let x = position.x + size.width / 2.0 - 190.0 * scale;
+            let y = position.y + size.height + 6.0 * scale;
+            let _ = w.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+        }
+    }
+    let _ = w.show();
+    let _ = w.set_focus();
+    let _ = app.emit_to("quick", EVT_QUICK_OPEN, payload);
+}
+
+fn hide_dock(app: &tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.set_dock_visibility(false);
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+fn show_dock(app: &tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.set_dock_visibility(true);
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+fn clear_clipboard_candidate(app: &tauri::AppHandle) {
+    if let Ok(mut current) = app.state::<ClipboardState>().0.lock() {
+        *current = None;
+    }
 }

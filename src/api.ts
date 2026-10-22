@@ -14,6 +14,13 @@ export const EVT_PROGRESS = "download://progress";
 export const EVT_TASKS = "download://tasks";
 /** 托盘「新建下载」 */
 export const EVT_NEW_TASK = "tdm://new-task";
+export const EVT_QUICK_OPEN = "tdm://quick-open";
+
+export interface QuickOpenContext {
+  mode: "manual" | "clipboard";
+  url: string | null;
+  filename: string | null;
+}
 
 export const api = {
   startDownload: (req: NewTaskRequest) =>
@@ -67,6 +74,10 @@ export const api = {
   getAppInfo: () => invoke<AppInfo>("get_app_info"),
 
   copyText: (text: string) => invoke<void>("copy_text", { text }),
+
+  quickClipboardHint: () => invoke<string | null>("quick_clipboard_hint"),
+  quickOpenContext: () => invoke<QuickOpenContext>("quick_open_context"),
+  hideQuickWindow: () => invoke<void>("hide_quick_window"),
 };
 
 /** 订阅实时进度事件 */

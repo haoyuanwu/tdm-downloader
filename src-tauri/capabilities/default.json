@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "默认权限：核心 IPC + 对话框 + 剪贴板 + 打开外部程序",
-  "windows": ["main"],
+  "windows": ["main", "quick"],
   "permissions": [
     "core:default",
     "core:app:default",

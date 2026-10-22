@@ -3,7 +3,7 @@
 > 📘 **软件介绍（面向用户）**：[SOFTWARE_INTRO.md](SOFTWARE_INTRO.md) — 功能、安装、上手、设置、FAQ
 > 📄 本文件是**技术向说明**：架构、IPC 接口、构建与测试
 
-一个用 **Tauri 2 + Rust** 构建的 Windows 多线程下载管理器。
+一个用 **Tauri 2 + Rust** 构建的多线程下载管理器。macOS 下载、构建和发布说明见 [MACOS.md](MACOS.md)。
 
 功能对标 TDM Fast（已通过 REA 逆向分析其实现），但**代码与 UI 完全自研**，
 不复制原软件的任何代码、文案或图标。

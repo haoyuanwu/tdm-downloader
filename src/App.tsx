@@ -20,6 +20,17 @@ export default function App() {
   const [clipboardUrl, setClipboardUrl] = useState<string | undefined>();
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 
+  const openNewDownload = useCallback(async () => {
+    try {
+      const { readText } = await import("@tauri-apps/plugin-clipboard-manager");
+      const text = (await readText()).trim();
+      setClipboardUrl(/^https?:\/\/\S+$/i.test(text) ? text : undefined);
+    } catch {
+      setClipboardUrl(undefined);
+    }
+    setShowNew(true);
+  }, []);
+
   // ── 初始加载 ──
   useEffect(() => {
     (async () => {
@@ -68,7 +79,7 @@ export default function App() {
         );
       });
       // 托盘菜单「新建下载」
-      un3 = await onNewTask(() => setShowNew(true));
+      un3 = await onNewTask(() => { void openNewDownload(); });
     })();
 
     return () => {
@@ -76,29 +87,7 @@ export default function App() {
       un2?.();
       un3?.();
     };
-  }, []);
-
-  // ── 剪贴板链接自动识别 ──
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const { readText } = await import("@tauri-apps/plugin-clipboard-manager");
-        const text = await readText();
-        if (!cancelled && text && /^https?:\/\/\S+$/i.test(text.trim())) {
-          setClipboardUrl(text.trim());
-        }
-      } catch {
-        /* 忽略 */
-      }
-    };
-    check();
-    const timer = setInterval(check, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
+  }, [openNewDownload]);
 
   // ── 任务栏进度条 ──
   useEffect(() => {
@@ -266,7 +255,7 @@ export default function App() {
           </button>
         </Tooltip>
         <Tooltip text="新建下载任务，可一次粘贴多个链接">
-          <button className="btn btn-primary" onClick={() => setShowNew(true)}>
+          <button className="btn btn-primary" onClick={() => { void openNewDownload(); }}>
             + 新建下载
           </button>
         </Tooltip>
@@ -276,23 +265,6 @@ export default function App() {
           </button>
         </Tooltip>
       </div>
-
-      {clipboardUrl && (
-        <div className="clipboard-bar">
-          <span className="dim">检测到剪贴板链接：</span>
-          <span className="ellipsis">{clipboardUrl}</span>
-          <Tooltip text="用这个链接新建下载">
-            <button className="btn btn-icon" onClick={() => setShowNew(true)}>
-              下载
-            </button>
-          </Tooltip>
-          <Tooltip text="忽略这个链接">
-            <button className="btn btn-icon" onClick={() => setClipboardUrl(undefined)}>
-              ✕
-            </button>
-          </Tooltip>
-        </div>
-      )}
 
       <div className="content">
         {filtered.length === 0 ? (
