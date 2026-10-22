@@ -1,14 +1,14 @@
 # TDM Downloader
 
 > 📘 **软件介绍（面向用户）**：[SOFTWARE_INTRO.md](SOFTWARE_INTRO.md) — 功能、安装、上手、设置、FAQ
+> 📦 **版本发布列表**：[GitHub Releases](https://github.com/haoyuanwu/tdm-downloader/releases) — 下载各平台安装包、查看更新说明及历史版本
 > 📄 本文件是**技术向说明**：架构、IPC 接口、构建与测试
 
 一个用 **Tauri 2 + Rust** 构建的多线程下载管理器。macOS 下载、构建和发布说明见 [MACOS.md](MACOS.md)。
 
-下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
+Windows 适配说明与两端功能差异见 [WINDOWS.md](WINDOWS.md)。
 
-功能对标 TDM Fast（已通过 REA 逆向分析其实现），但**代码与 UI 完全自研**，
-不复制原软件的任何代码、文案或图标。
+下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
 
 ## 特性
 
@@ -165,4 +165,4 @@ cd src-tauri && cargo test
 
 - 分段下载要求服务端支持 `Accept-Ranges: bytes`；不支持时自动退化为单连接
 - 文件大小未知时（无 Content-Length）使用单连接流式下载
-- 尚未实现托盘菜单与浏览器协议接管（P1）
+- 尚未实现浏览器协议接管（P1）；托盘菜单已实现

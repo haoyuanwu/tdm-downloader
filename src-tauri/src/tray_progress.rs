@@ -255,6 +255,9 @@ pub(crate) fn progress_icon(
                 alpha = alpha.max((scale * 0.43 + 0.5 - distance).clamp(0., 1.));
             }
             let offset = ((y * SIZE + x) * 4) as usize;
+            // macOS 模板图由系统着色；Windows 直接显示 RGBA，使用蓝色确保浅色任务栏可见。
+            #[cfg(not(target_os = "macos"))]
+            rgba[offset..offset + 3].copy_from_slice(&[36, 145, 235]);
             rgba[offset + 3] = (alpha * 255.).round() as u8;
         }
     }

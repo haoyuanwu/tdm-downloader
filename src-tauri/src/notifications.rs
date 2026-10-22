@@ -1,6 +1,8 @@
-//! macOS 原生通知：真实授权、前台展示和可查询的送达记录。
+//! 系统通知、权限状态与独立完成提示音。
 
-use serde::{Deserialize, Serialize};
+#[cfg(target_os = "macos")]
+use serde::Deserialize;
+use serde::Serialize;
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -10,8 +12,8 @@ pub struct NotificationState(Mutex<Option<String>>);
 #[derive(Serialize, Default)]
 pub struct NotificationStatus {
     authorization: String,
-    alerts_enabled: bool,
-    center_enabled: bool,
+    alerts_enabled: Option<bool>,
+    center_enabled: Option<bool>,
     bundle_id: String,
     delivered_ids: Vec<String>,
     last_error: Option<String>,
@@ -26,6 +28,20 @@ fn record_result(app: &tauri::AppHandle, result: &Result<(), String>) {
 pub async fn initialize(app: tauri::AppHandle) {
     #[cfg(target_os = "macos")]
     native::register_click_handler(app.clone());
+    #[cfg(windows)]
+    {
+        use tauri_plugin_notification::NotificationExt;
+        let handle = app.clone();
+        let _ = app.notification().on_action(move |_| {
+            let handle = handle.clone();
+            let dispatcher = handle.clone();
+            let _ = dispatcher.run_on_main_thread(move || {
+                use tauri::Emitter;
+                let _ = handle.emit("tdm://show-downloads", ());
+                let _ = crate::show_main_window(handle);
+            });
+        });
+    }
     let result = request_permission().await;
     if let Err(error) = &result {
         eprintln!("通知授权：{error}");
@@ -60,7 +76,23 @@ async fn play_sound() -> Result<(), String> {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+async fn play_sound() -> Result<(), String> {
+    tokio::task::spawn_blocking(|| {
+        use windows::{
+            core::w,
+            Win32::Media::Audio::{PlaySoundW, SND_ALIAS, SND_SYNC},
+        };
+        // 同步播放放在阻塞线程，保证退出前声音已播放，且不依赖通知权限。
+        unsafe { PlaySoundW(w!("SystemNotification"), None, SND_ALIAS | SND_SYNC) }
+            .ok()
+            .map_err(|error| format!("播放提示音失败：{error}"))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 async fn play_sound() -> Result<(), String> {
     Ok(())
 }
@@ -203,13 +235,10 @@ async fn send_visual(
     {
         use tauri_plugin_notification::NotificationExt;
         let _ = id;
-        app.notification()
-            .builder()
-            .title(title)
-            .body(body)
-            .sound("Default")
-            .show()
-            .map_err(|error| error.to_string())
+        let notification = app.notification().builder().title(title).body(body);
+        #[cfg(not(windows))]
+        let notification = notification.sound("Default");
+        notification.show().map_err(|error| error.to_string())
     }
 }
 
@@ -226,18 +255,48 @@ pub async fn notification_status(app: tauri::AppHandle) -> Result<NotificationSt
                 _ => "unknown",
             }
             .into(),
-            alerts_enabled: reply.alerts_enabled,
-            center_enabled: reply.center_enabled,
+            alerts_enabled: Some(reply.alerts_enabled),
+            center_enabled: Some(reply.center_enabled),
             bundle_id: reply.bundle_id,
             delivered_ids: reply.delivered_ids,
             ..Default::default()
         }
     };
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    let status = {
+        use windows::{
+            core::HSTRING,
+            UI::Notifications::{NotificationSetting, ToastNotificationManager},
+        };
+        let exe = tauri::utils::platform::current_exe().map_err(|e| e.to_string())?;
+        let dir = exe.parent().unwrap_or(std::path::Path::new(""));
+        // 与 tauri-plugin-notification 的开发/安装身份选择保持一致。
+        let development = dir.ends_with("target/debug") || dir.ends_with("target/release");
+        let id = if development {
+            "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
+        } else {
+            &app.config().identifier
+        };
+        let notifier = ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(id))
+            .map_err(|e| format!("读取通知状态失败：{e}"))?;
+        let setting = notifier.Setting().map_err(|e| e.to_string())?;
+        NotificationStatus {
+            authorization: if development {
+                "unknown"
+            } else if setting == NotificationSetting::Enabled {
+                "authorized"
+            } else {
+                "denied"
+            }
+            .into(),
+            bundle_id: id.into(),
+            // Setting 不区分横幅、通知中心及勿扰模式，不能将其伪报为已开启。
+            ..Default::default()
+        }
+    };
+    #[cfg(not(any(windows, target_os = "macos")))]
     let status = NotificationStatus {
-        authorization: "authorized".into(),
-        alerts_enabled: true,
-        center_enabled: true,
+        authorization: "unknown".into(),
         ..Default::default()
     };
     let last_error = app
@@ -271,7 +330,10 @@ pub async fn test_download_notification(app: tauri::AppHandle) -> Result<String,
             );
         }
     }
-    Ok("测试通知已送达通知中心，提示音已播放".into())
+    #[cfg(target_os = "macos")]
+    return Ok("测试通知已送达通知中心，提示音已播放".into());
+    #[cfg(not(target_os = "macos"))]
+    Ok("已提交通知请求并播放提示音；是否显示横幅请检查系统通知及勿扰设置".into())
 }
 
 #[tauri::command]
@@ -293,7 +355,14 @@ pub async fn open_notification_settings(app: tauri::AppHandle) -> Result<(), Str
             Err("无法打开通知设置".into())
         }
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        app.opener()
+            .open_url("ms-settings:notifications", None::<&str>)
+            .map_err(|error| error.to_string())
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let _ = app;
         Err("请在系统设置中管理通知权限".into())

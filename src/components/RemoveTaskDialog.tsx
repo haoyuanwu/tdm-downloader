@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { trashName } from "../platform";
 import type { DownloadTask } from "../types";
 
 interface Props {
@@ -50,7 +51,7 @@ export function RemoveTaskDialog({ tasks, initialDeleteFiles, busy, error, onCon
           </label>
           <label className={deleteFiles ? "is-selected" : ""}>
             <input type="radio" name="remove-files" checked={deleteFiles} onChange={() => setDeleteFiles(true)} />
-            <span><strong>同时删除本地文件</strong><small>下载文件和未完成分片将移到废纸篓</small></span>
+            <span><strong>同时删除本地文件</strong><small>下载文件和未完成分片将移到{trashName}</small></span>
           </label>
         </fieldset>
         <label className="checkbox-row remove-remember">

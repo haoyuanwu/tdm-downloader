@@ -4,14 +4,12 @@
 
 它的设计目标很单纯：**把大文件又快又稳地拉下来**——速度快、断了能续、限速可控、出问题自己重连。
 
-> 功能对标同类下载工具，但**代码与界面完全自研**，不含任何第三方软件的源码或素材。
-
 **下载**：
 
 - macOS v0.2.4 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_arm64.dmg)
 - macOS v0.2.4 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_x86_64.dmg)
 - Windows v0.2.2 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe)
-- 全部版本：<https://github.com/haoyuanwu/tdm-downloader/releases>
+- [版本发布列表（GitHub Releases）](https://github.com/haoyuanwu/tdm-downloader/releases)：下载各平台安装包、查看更新说明及历史版本
 
 > 仓库目前是私有的，链接需要登录 GitHub 账号后访问。
 

@@ -84,7 +84,7 @@ export function TaskCard({
       <div className="task-top">
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="task-name">{task.filename}</div>
-          <div className="task-url">{task.url}</div>
+          <div className="task-url" title={task.url}>{task.url}</div>
         </div>
 
         {isActive && <Sparkline data={history} />}

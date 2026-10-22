@@ -1325,7 +1325,9 @@ fn system_power(shutdown: bool) -> Result<(), String> {
     #[cfg(windows)]
     {
         if shutdown {
+            use std::os::windows::process::CommandExt;
             std::process::Command::new("shutdown")
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
                 .args([
                     "/s",
                     "/t",
@@ -1337,11 +1339,12 @@ fn system_power(shutdown: bool) -> Result<(), String> {
                 .map(|_| ())
                 .map_err(|e| e.to_string())
         } else {
-            std::process::Command::new("rundll32.exe")
-                .args(["powrprof.dll,SetSuspendState", "0,1,0"])
-                .spawn()
-                .map(|_| ())
-                .map_err(|e| e.to_string())
+            // SetSuspendState 并非 rundll32 入口，必须按原生函数签名调用。
+            if unsafe { windows::Win32::System::Power::SetSuspendState(false, false, false) } {
+                Ok(())
+            } else {
+                Err(format!("进入睡眠失败：{}", std::io::Error::last_os_error()))
+            }
         }
     }
     #[cfg(target_os = "macos")]

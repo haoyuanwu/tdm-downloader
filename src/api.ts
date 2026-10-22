@@ -24,8 +24,8 @@ export interface QuickOpenContext {
 
 export interface NotificationStatus {
   authorization: "not_determined" | "denied" | "authorized" | "unknown";
-  alerts_enabled: boolean;
-  center_enabled: boolean;
+  alerts_enabled: boolean | null;
+  center_enabled: boolean | null;
   bundle_id: string;
   delivered_ids: string[];
   last_error: string | null;

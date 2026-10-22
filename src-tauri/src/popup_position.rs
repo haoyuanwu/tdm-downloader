@@ -31,12 +31,19 @@ impl Anchor {
         let height = (height * self.scale).min((self.bounds.height - 2.0 * margin).max(1.0));
         let left = self.bounds.x + margin;
         let top = self.bounds.y + margin;
+        let below = self.icon.y + self.icon.height + 6.0 * self.scale;
+        // Windows 托盘通常在底部；下方放不下时向上展开，避免遮挡任务栏。
+        let y = if below + height > self.bounds.y + self.bounds.height - margin {
+            self.icon.y - 6.0 * self.scale - height
+        } else {
+            below
+        };
         Rect {
             x: (self.icon.x + self.icon.width / 2.0 - width / 2.0).clamp(
                 left,
                 (self.bounds.x + self.bounds.width - margin - width).max(left),
             ),
-            y: (self.icon.y + self.icon.height + 6.0 * self.scale).clamp(
+            y: y.clamp(
                 top,
                 (self.bounds.y + self.bounds.height - margin - height).max(top),
             ),
@@ -91,10 +98,20 @@ pub fn resolve(app: &tauri::AppHandle, clicked: Option<tauri::Rect>) -> Option<A
     #[cfg(not(target_os = "macos"))]
     {
         let position = app.cursor_position().ok()?;
-        let monitor = app.monitor_from_point(position.x, position.y).ok()??;
+        // 自动唤起时鼠标可能位于另一块屏幕，应优先使用托盘所在屏幕。
+        let point = rect
+            .as_ref()
+            .map(|rect| {
+                let p = rect.position.to_physical::<f64>(1.0);
+                let s = rect.size.to_physical::<f64>(1.0);
+                (p.x + s.width / 2.0, p.y + s.height / 2.0)
+            })
+            .unwrap_or((position.x, position.y));
+        let monitor = app.monitor_from_point(point.0, point.1).ok()??;
         let scale = monitor.scale_factor();
-        let origin = monitor.position();
-        let size = monitor.size();
+        let work_area = monitor.work_area();
+        let origin = &work_area.position;
+        let size = &work_area.size;
         let icon = rect
             .map(|rect| {
                 let p = rect.position.to_physical::<f64>(scale);
@@ -195,5 +212,31 @@ mod tests {
             anchor(0.0, 24.0, 1920.0, 1056.0, 1900.0).placement(174.0).x,
             1532.0
         );
+    }
+
+    #[test]
+    fn bottom_taskbar_popup_opens_above_icon_at_mixed_dpi() {
+        for scale in [1.0, 1.25, 1.5, 2.0] {
+            let a = Anchor {
+                bounds: Rect {
+                    x: -2560.0,
+                    y: 0.0,
+                    width: 2560.0,
+                    height: 1400.0,
+                },
+                icon: Rect {
+                    x: -80.0,
+                    y: 1410.0,
+                    width: 24.0 * scale,
+                    height: 24.0 * scale,
+                },
+                scale,
+            };
+            let p = a.placement(390.0);
+            assert!(p.y + p.height < a.icon.y);
+            assert!(p.y + p.height <= a.bounds.height - 8.0 * scale);
+            assert!(p.x + p.width <= -8.0 * scale);
+            assert_eq!(p.width, 380.0 * scale);
+        }
     }
 }

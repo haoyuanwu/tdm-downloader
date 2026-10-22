@@ -9,6 +9,7 @@ import type {
   ThemeMode,
 } from "../types";
 import { formatBytes } from "../types";
+import { isWindows, trashName } from "../platform";
 
 interface Props {
   settings: Settings;
@@ -32,7 +33,7 @@ const FINISH_LABEL: Record<AfterFinishAction, string> = {
   none: "不执行操作",
   quit: "退出 TDM Downloader",
   shutdown: "关机（30 秒后）",
-  sleep: "休眠",
+  sleep: "睡眠",
 };
 
 export function SettingsPanel({ settings, onClose, onSaved }: Props) {
@@ -78,7 +79,9 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
 
   const notificationHint = !notification ? "正在读取通知权限…"
     : notification.authorization === "denied" ? "通知权限已关闭，请在系统设置中允许通知"
+    : isWindows && notification.authorization === "unknown" ? "开发版通知使用 Windows PowerShell 身份；请在安装版中检查应用通知权限"
     : notification.authorization !== "authorized" ? "需要允许发送通知，才能收到下载完成提醒"
+    : notification.center_enabled === null || notification.alerts_enabled === null ? "系统允许发送通知；横幅、通知中心和勿扰状态请在系统通知设置中确认"
     : !notification.center_enabled ? "通知中心显示已关闭，请在系统设置中开启"
     : !notification.alerts_enabled ? "通知会显示在通知中心；横幅已关闭"
     : `已允许通知，下载完成后会显示横幅并保留在通知中心${notification.delivered_ids.length ? `（当前 ${notification.delivered_ids.length} 条提醒）` : ""}`;
@@ -135,7 +138,7 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
                 <option value="dark">深色</option>
                 <option value="light">浅色</option>
               </select>
-              <div className="hint">选择跟随系统后，将随 macOS 外观自动切换深浅色。</div>
+              <div className="hint">选择跟随系统后，将随系统外观自动切换深浅色。</div>
             </div>
           </section>
           <section>
@@ -243,7 +246,7 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
               <select value={form.remove_task_files ? "delete" : "keep"}
                 onChange={(event) => set("remove_task_files", event.target.value === "delete")}>
                 <option value="keep">保留本地文件</option>
-                <option value="delete">同时删除本地文件（移到废纸篓）</option>
+                <option value="delete">同时删除本地文件（移到{trashName}）</option>
               </select>
               <div className="hint">开启询问时作为默认选项；关闭询问后直接按此项处理。</div>
             </div>
@@ -290,7 +293,7 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             </div>
             <div className="hint">
               {form.proxy_mode === "system"
-                ? "跟随 macOS 网络设置中的代理；PAC 自动配置请使用自定义代理地址"
+                ? `跟随${isWindows ? " Windows 系统" : " macOS 网络设置中的"}手动代理；PAC 自动配置请使用自定义代理地址`
                 : form.proxy_mode === "none"
                 ? "直连，同时忽略 HTTP_PROXY 等环境变量"
                 : "使用下方手动填写的代理"}
