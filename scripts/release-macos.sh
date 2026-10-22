@@ -15,6 +15,14 @@ for command_name in node npm rustup lipo hdiutil shasum git gh; do
 done
 gh auth status >/dev/null
 
+reuse_existing=false
+if [[ "${1:-}" == "--reuse-existing" ]]; then
+  reuse_existing=true
+elif [[ $# -gt 0 ]]; then
+  echo "用法：npm run release:macos [-- --reuse-existing]" >&2
+  exit 1
+fi
+
 if [[ "$(git branch --show-current)" != main ]]; then
   echo "请在 main 分支发布" >&2
   exit 1
@@ -50,12 +58,19 @@ build_dmg() {
   local target="$1" label="$2" bundle_dir dmg_dir app_binary source_dmg output_dmg actual_arch
   bundle_dir="src-tauri/target/$target/release/bundle"
   dmg_dir="$bundle_dir/dmg"
+  app_binary="src-tauri/target/$target/release/tdm-downloader"
+  output_dmg="release/TDM-Downloader_${version}_macos_${label}.dmg"
+  if [[ "$reuse_existing" == true && -f "$app_binary" && -f "$output_dmg" ]]; then
+    [[ "$(lipo -archs "$app_binary")" == "$label" ]] || { echo "$label 架构不匹配" >&2; exit 1; }
+    hdiutil verify "$output_dmg" >/dev/null
+    echo "复用已生成的 $output_dmg"
+    return
+  fi
   rm -rf "$dmg_dir"
   echo "正在构建 $label ($target)……"
   npm run tauri -- build --target "$target" --bundles dmg --ci --no-sign
 
   # Tauri 生成 DMG 后会清理临时 .app，发布版可执行文件仍保留在 release/。
-  app_binary="src-tauri/target/$target/release/tdm-downloader"
   [[ -f "$app_binary" ]] || { echo "找不到应用可执行文件：$app_binary" >&2; exit 1; }
   actual_arch="$(lipo -archs "$app_binary")"
   if [[ "$actual_arch" != "$label" ]]; then
@@ -65,7 +80,6 @@ build_dmg() {
 
   source_dmg="$(find "$dmg_dir" -maxdepth 1 -type f -name "*.dmg" -print -quit)"
   [[ -n "$source_dmg" ]] || { echo "找不到 $label DMG" >&2; exit 1; }
-  output_dmg="release/TDM-Downloader_${version}_macos_${label}.dmg"
   cp "$source_dmg" "$output_dmg"
   hdiutil verify "$output_dmg" >/dev/null
   echo "已生成：$output_dmg"
@@ -87,17 +101,17 @@ cat > "$notes_file" <<EOF
 
 | 文件 | 适用 Mac | SHA256 |
 | --- | --- | --- |
-| `$(basename "$arm_dmg")` | Apple 芯片 (arm64) | `$arm_sha` |
-| `$(basename "$x86_dmg")` | Intel (x86_64) | `$x86_sha` |
+| $(basename "$arm_dmg") | Apple 芯片 (arm64) | $arm_sha |
+| $(basename "$x86_dmg") | Intel (x86_64) | $x86_sha |
 
 安装包未进行 Apple 开发者签名和公证。首次打开时可能需要在系统设置的“隐私与安全性”中允许运行。
 EOF
 
-git push origin main
+git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main
 if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   git tag -a "$tag" -m "发布 TDM Downloader $version macOS 双架构版本"
 fi
-git push origin "$tag"
+git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin "$tag"
 
 if gh release view "$tag" >/dev/null 2>&1; then
   gh release upload "$tag" "$arm_dmg" "$x86_dmg" --clobber

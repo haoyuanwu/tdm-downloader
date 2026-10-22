@@ -23,6 +23,8 @@ npm run release:macos
 
 脚本会安装所需 Rust 目标，分别构建 arm64 和 x86_64 的未签名 DMG，核对应用可执行文件架构与磁盘映像完整性，计算 SHA256，推送 `main` 和版本标签，并上传到 GitHub Releases。文件也保存在 `release/`。同一版本已正式发布时，脚本会要求先更新版本号。
 
+如果构建已完成但上传中断，确认源码未变后可运行 `npm run release:macos -- --reuse-existing`，复用并再次校验已生成的 DMG。
+
 ## macOS 集成
 
 - 默认下载到 `~/Downloads`，设置保存在 `~/Library/Application Support/tdm-downloader/settings.json`。
