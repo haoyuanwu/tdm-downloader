@@ -1,4 +1,4 @@
-# TDM Downloader 软件介绍
+# TDM Downloader 项目简介
 
 一款适用于 macOS 和 Windows 的**多线程下载管理器**。安装包体积小，不用安装浏览器扩展即可使用。
 

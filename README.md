@@ -1,6 +1,6 @@
-# TDM Downloader
+# TDM Downloader 软件介绍
 
-> 📘 **软件介绍（面向用户）**：[SOFTWARE_INTRO.md](SOFTWARE_INTRO.md) — 功能、安装、上手、设置、FAQ
+> 📘 **项目简介**：[查看项目简介](SOFTWARE_INTRO.md) — 功能、安装、上手、设置、FAQ
 > 📦 **版本发布列表**：[GitHub Releases](https://github.com/haoyuanwu/tdm-downloader/releases) — 下载各平台安装包、查看更新说明及历史版本
 > 📄 本文件是**技术向说明**：架构、IPC 接口、构建与测试
 
