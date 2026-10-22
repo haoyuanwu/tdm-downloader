@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import type { NotificationStatus } from "../api";
 import type {
   AfterFinishAction,
   FileExistsAction,
@@ -37,11 +38,50 @@ const FINISH_LABEL: Record<AfterFinishAction, string> = {
 export function SettingsPanel({ settings, onClose, onSaved }: Props) {
   const [form, setForm] = useState<Settings>({ ...settings });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [autostart, setAutostart] = useState(false);
+  const [notification, setNotification] = useState<NotificationStatus | null>(null);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [testingNotification, setTestingNotification] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !saving && !event.defaultPrevented) {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, saving]);
 
   useEffect(() => {
     api.getAutostart().then(setAutostart).catch(() => {});
+    const refresh = () => { void api.notificationStatus().then(setNotification).catch((error) => setNotificationMessage(String(error))); };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
+
+  const testNotification = async () => {
+    setTestingNotification(true);
+    setNotificationMessage("");
+    try {
+      setNotificationMessage(await api.testDownloadNotification());
+    } catch (error) {
+      setNotificationMessage(String(error));
+    } finally {
+      setTestingNotification(false);
+      void api.notificationStatus().then(setNotification).catch(() => {});
+    }
+  };
+
+  const notificationHint = !notification ? "正在读取通知权限…"
+    : notification.authorization === "denied" ? "通知权限已关闭，请在系统设置中允许通知"
+    : notification.authorization !== "authorized" ? "需要允许发送通知，才能收到下载完成提醒"
+    : !notification.center_enabled ? "通知中心显示已关闭，请在系统设置中开启"
+    : !notification.alerts_enabled ? "通知会显示在通知中心；横幅已关闭"
+    : `已允许通知，下载完成后会显示横幅并保留在通知中心${notification.delivered_ids.length ? `（当前 ${notification.delivered_ids.length} 条提醒）` : ""}`;
 
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -57,24 +97,47 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
 
   const save = async () => {
     setSaving(true);
+    setSaveError("");
     try {
       await api.saveSettings(form);
       await api.setAutostart(autostart);
       onSaved(form);
       onClose();
     } catch (e) {
-      console.error(e);
+      setSaveError(String(e));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-        <h2>设置</h2>
+    <div className="modal-overlay" onClick={() => { if (!saving) onClose(); }}>
+      <div className="modal modal-wide settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-header">
+          <h2 id="settings-title">设置</h2>
+          <button type="button" className="btn settings-close" aria-label="关闭设置" title="关闭（Esc）" onClick={onClose} disabled={saving}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
 
         <div className="settings-body">
+          <section>
+            <h3 className="section-title">外观</h3>
+            <div className="field">
+              <label>主题</label>
+              <select
+                value={form.theme}
+                onChange={(e) => set("theme", e.target.value as ThemeMode)}
+              >
+                <option value="system">跟随系统</option>
+                <option value="dark">深色</option>
+                <option value="light">浅色</option>
+              </select>
+              <div className="hint">选择跟随系统后，将随 macOS 外观自动切换深浅色。</div>
+            </div>
+          </section>
           <section>
             <h3 className="section-title">下载</h3>
 
@@ -169,6 +232,22 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
                 ))}
               </select>
             </div>
+
+            <div className="checkbox-row">
+              <input type="checkbox" id="confirm_remove_task" checked={form.confirm_remove_task}
+                onChange={(event) => set("confirm_remove_task", event.target.checked)} />
+              <label htmlFor="confirm_remove_task" style={{ margin: 0 }}>删除任务时询问是否删除本地文件</label>
+            </div>
+            <div className="field">
+              <label>删除任务时的文件处理方式</label>
+              <select value={form.remove_task_files ? "delete" : "keep"}
+                onChange={(event) => set("remove_task_files", event.target.value === "delete")}>
+                <option value="keep">保留本地文件</option>
+                <option value="delete">同时删除本地文件（移到废纸篓）</option>
+              </select>
+              <div className="hint">开启询问时作为默认选项；关闭询问后直接按此项处理。</div>
+            </div>
+            <div className="hint">当前全局限速：{form.speed_limit > 0 ? formatBytes(form.speed_limit) + "/s" : "不限速"}</div>
           </section>
 
           <section>
@@ -222,6 +301,17 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             <h3 className="section-title">系统</h3>
 
             <div className="field">
+              <label>下载完成提醒</label>
+              <div className="notification-controls">
+                <button className="btn" disabled={testingNotification} onClick={() => void testNotification()}>
+                  {testingNotification ? "正在发送…" : "测试通知和提示音"}
+                </button>
+                <button className="btn" onClick={() => void api.openNotificationSettings().catch((error) => setNotificationMessage(String(error)))}>打开通知设置</button>
+              </div>
+              <div className="hint" role="status">{notificationMessage || notification?.last_error || notificationHint}</div>
+            </div>
+
+            <div className="field">
               <label>全部下载完成后</label>
               <select
                 value={form.after_finish}
@@ -260,22 +350,9 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             </div>
           </section>
 
-          <section>
-            <h3 className="section-title">外观</h3>
-            <div className="field">
-              <label>主题</label>
-              <select
-                value={form.theme}
-                onChange={(e) => set("theme", e.target.value as ThemeMode)}
-              >
-                <option value="dark">深色</option>
-                <option value="light">浅色</option>
-              </select>
-            </div>
-            <div className="hint">当前全局限速：{form.speed_limit > 0 ? formatBytes(form.speed_limit) + "/s" : "不限速"}</div>
-          </section>
         </div>
 
+        {saveError && <p className="error-text" role="alert">{saveError}</p>}
         <div className="modal-footer">
           <button className="btn" onClick={onClose} disabled={saving}>
             取消

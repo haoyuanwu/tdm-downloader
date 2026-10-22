@@ -17,9 +17,18 @@ export const EVT_NEW_TASK = "tdm://new-task";
 export const EVT_QUICK_OPEN = "tdm://quick-open";
 
 export interface QuickOpenContext {
-  mode: "manual" | "clipboard";
+  mode: "manual" | "clipboard" | "tasks";
   url: string | null;
   filename: string | null;
+}
+
+export interface NotificationStatus {
+  authorization: "not_determined" | "denied" | "authorized" | "unknown";
+  alerts_enabled: boolean;
+  center_enabled: boolean;
+  bundle_id: string;
+  delivered_ids: string[];
+  last_error: string | null;
 }
 
 export const api = {
@@ -78,6 +87,10 @@ export const api = {
   quickClipboardHint: () => invoke<string | null>("quick_clipboard_hint"),
   quickOpenContext: () => invoke<QuickOpenContext>("quick_open_context"),
   hideQuickWindow: () => invoke<void>("hide_quick_window"),
+  showQuickInput: () => invoke<void>("show_quick_input"),
+  notificationStatus: () => invoke<NotificationStatus>("notification_status"),
+  testDownloadNotification: () => invoke<string>("test_download_notification"),
+  openNotificationSettings: () => invoke<void>("open_notification_settings"),
 };
 
 /** 订阅实时进度事件 */
@@ -93,4 +106,8 @@ export function onTasks(cb: (tasks: DownloadTask[]) => void) {
 /** 订阅托盘「新建下载」 */
 export function onNewTask(cb: () => void) {
   return listen(EVT_NEW_TASK, () => cb());
+}
+
+export function onShowDownloads(cb: () => void) {
+  return listen("tdm://show-downloads", () => cb());
 }

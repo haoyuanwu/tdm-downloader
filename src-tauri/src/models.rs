@@ -142,6 +142,7 @@ impl Default for AfterFinishAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ThemeMode {
+    System,
     Dark,
     Light,
 }
@@ -295,6 +296,10 @@ pub struct Settings {
     pub user_agent: String,
     /// 文件已存在时的处理方式
     pub file_exists: FileExistsAction,
+    /// 移除任务时是否询问本地文件处理方式
+    pub confirm_remove_task: bool,
+    /// 不询问时是否同时将本地文件移到废纸篓
+    pub remove_task_files: bool,
     /// 全部下载完成后的动作
     pub after_finish: AfterFinishAction,
     /// 关闭窗口时最小化到托盘
@@ -318,6 +323,8 @@ impl Default for Settings {
             proxy_addr: String::new(),
             user_agent: engine_default_ua(),
             file_exists: FileExistsAction::Rename,
+            confirm_remove_task: true,
+            remove_task_files: false,
             after_finish: AfterFinishAction::None,
             close_to_tray: true,
             autostart: false,

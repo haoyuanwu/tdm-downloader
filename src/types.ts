@@ -13,7 +13,7 @@ export type TaskStatus =
 export type ProxyMode = "system" | "none" | "custom";
 export type FileExistsAction = "rename" | "overwrite" | "skip";
 export type AfterFinishAction = "none" | "quit" | "shutdown" | "sleep";
-export type ThemeMode = "dark" | "light";
+export type ThemeMode = "system" | "dark" | "light";
 
 export interface SegmentProgress {
   index: number;
@@ -74,6 +74,8 @@ export interface Settings {
   proxy_addr: string;
   user_agent: string;
   file_exists: FileExistsAction;
+  confirm_remove_task: boolean;
+  remove_task_files: boolean;
   after_finish: AfterFinishAction;
   close_to_tray: boolean;
   autostart: boolean;
@@ -106,6 +108,8 @@ export const DEFAULT_SETTINGS: Settings = {
   proxy_addr: "",
   user_agent: "",
   file_exists: "rename",
+  confirm_remove_task: true,
+  remove_task_files: false,
   after_finish: "none",
   close_to_tray: true,
   autostart: false,

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, onNewTask, onProgress, onTasks } from "./api";
+import { api, onNewTask, onProgress, onTasks, onShowDownloads } from "./api";
 import { NewDownloadDialog } from "./components/NewDownloadDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { TaskCard } from "./components/TaskCard";
+import { RemoveTaskDialog } from "./components/RemoveTaskDialog";
 import { Tooltip } from "./components/Tooltip";
 import type { AppInfo, DownloadTask, NewTaskRequest, Settings } from "./types";
 import { DEFAULT_SETTINGS, formatBytes, formatSpeed } from "./types";
+import { useTheme } from "./useTheme";
 
 type Filter = "all" | "active" | "completed";
 
@@ -19,6 +21,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [clipboardUrl, setClipboardUrl] = useState<string | undefined>();
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [removeRequest, setRemoveRequest] = useState<DownloadTask[] | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState("");
 
   const openNewDownload = useCallback(async () => {
     try {
@@ -50,9 +55,7 @@ export default function App() {
   }, []);
 
   // ── 主题 ──
-  useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme;
-  }, [settings.theme]);
+  useTheme(settings.theme);
 
   // ── 事件订阅 ──
   useEffect(() => {
@@ -88,6 +91,18 @@ export default function App() {
       un3?.();
     };
   }, [openNewDownload]);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void onShowDownloads(() => {
+      setShowSettings(false);
+      setShowNew(false);
+      setFilter("all");
+      setQuery("");
+    }).then((cleanup) => { if (active) unlisten = cleanup; else cleanup(); });
+    return () => { active = false; unlisten?.(); };
+  }, []);
 
   // ── 任务栏进度条 ──
   useEffect(() => {
@@ -146,13 +161,44 @@ export default function App() {
     [refresh]
   );
 
-  const remove = useCallback(
-    async (id: string) => {
-      await api.removeTask(id, false);
-      await refresh();
+  const performRemove = useCallback(
+    async (requested: DownloadTask[], deleteFiles: boolean, remember: boolean) => {
+      setRemoving(true);
+      setRemoveError("");
+      try {
+        // 批量移除失败后重试时，跳过已成功移除的任务。
+        const existing = new Set((await api.listTasks()).map((task) => task.id));
+        for (const task of requested) {
+          if (existing.has(task.id)) await api.removeTask(task.id, deleteFiles);
+        }
+        if (remember) {
+          const next = { ...settings, confirm_remove_task: false, remove_task_files: deleteFiles };
+          await api.saveSettings(next);
+          setSettings(next);
+        }
+        setRemoveRequest(null);
+        await refresh();
+      } catch (error) {
+        setRemoveRequest(requested);
+        setRemoveError(String(error));
+        await refresh().catch(() => {});
+      } finally {
+        setRemoving(false);
+      }
     },
-    [refresh]
+    [refresh, settings]
   );
+
+  const requestRemove = useCallback((requested: DownloadTask[]) => {
+    if (!requested.length || removing) return;
+    setRemoveError("");
+    if (settings.confirm_remove_task) setRemoveRequest(requested);
+    else void performRemove(requested, settings.remove_task_files, false);
+  }, [performRemove, removing, settings.confirm_remove_task, settings.remove_task_files]);
+
+  const remove = useCallback((id: string) => {
+    requestRemove(tasks.filter((task) => task.id === id));
+  }, [requestRemove, tasks]);
 
   const openFile = useCallback(async (task: DownloadTask) => {
     try {
@@ -260,8 +306,11 @@ export default function App() {
           </button>
         </Tooltip>
         <Tooltip text="设置">
-          <button className="btn" onClick={() => setShowSettings(true)}>
-            ⚙
+          <button className="btn settings-entry" aria-label="设置" onClick={() => setShowSettings(true)}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m9.5 3-.6 2.4-1.3.8-2.4-.7-2.5 4.3 1.8 1.7v1.5l-1.8 1.7 2.5 4.3 2.4-.7 1.3.8.6 2.4h5l.6-2.4 1.3-.8 2.4.7 2.5-4.3-1.8-1.7v-1.5l1.8-1.7-2.5-4.3-2.4.7-1.3-.8L14.5 3Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
           </button>
         </Tooltip>
       </div>
@@ -313,13 +362,11 @@ export default function App() {
           {appInfo && ` · v${appInfo.version}`}
         </span>
         {tasks.some((t) => t.status === "completed") && (
-          <Tooltip text="清空列表中已完成的任务（不删除已下载的文件）">
+          <Tooltip text="移除列表中全部已完成的任务">
             <button
               className="btn btn-icon"
-              onClick={async () => {
-                await api.clearCompleted();
-                await refresh();
-              }}
+              disabled={removing}
+              onClick={() => requestRemove(tasks.filter((task) => task.status === "completed"))}
             >
               清空已完成
             </button>
@@ -341,6 +388,16 @@ export default function App() {
           settings={settings}
           onClose={() => setShowSettings(false)}
           onSaved={setSettings}
+        />
+      )}
+      {removeRequest && (
+        <RemoveTaskDialog
+          tasks={removeRequest}
+          initialDeleteFiles={settings.remove_task_files}
+          busy={removing}
+          error={removeError}
+          onClose={() => { if (!removing) setRemoveRequest(null); }}
+          onConfirm={(deleteFiles, remember) => { void performRemove(removeRequest, deleteFiles, remember); }}
         />
       )}
     </div>

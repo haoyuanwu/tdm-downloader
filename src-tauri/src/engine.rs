@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::{Mutex, Notify, Semaphore};
 use tokio::task::JoinHandle;
 
 pub const DEFAULT_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15 TDM-Downloader/0.2";
@@ -353,6 +353,8 @@ pub struct TaskHandle {
     pub limiter: Arc<Limiter>,
     /// 运行中的 join handle（用于等待结束）
     pub worker: Arc<Mutex<Option<JoinHandle<()>>>>,
+    /// 移除任务会中止整个下载流程，等待所有写入结束后处理本地文件。
+    pub removed: Arc<Notify>,
 }
 
 impl TaskHandle {
@@ -365,6 +367,7 @@ impl TaskHandle {
             speed: Arc::new(AtomicU64::new(0)),
             limiter: Arc::new(Limiter::new(speed_limit)),
             worker: Arc::new(Mutex::new(None)),
+            removed: Arc::new(Notify::new()),
         }
     }
 
@@ -483,10 +486,9 @@ pub fn load_settings() -> Option<Settings> {
     serde_json::from_str::<Settings>(&data).ok()
 }
 
-pub fn persist_settings(s: &Settings) {
-    if let Ok(json) = serde_json::to_string_pretty(s) {
-        let _ = fs::write(settings_file(), json);
-    }
+pub fn persist_settings(s: &Settings) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(s).map_err(|error| error.to_string())?;
+    fs::write(settings_file(), json).map_err(|error| format!("保存设置失败：{error}"))
 }
 
 // ────────────────────────── 文件名推断 ──────────────────────────
@@ -980,13 +982,14 @@ pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle
         let speed = handle.speed.clone();
         let app_c = app.clone();
         let cancel = mon_cancel.clone();
+        let task_cancel = handle.cancel.clone();
         let id_c = id.clone();
         tokio::spawn(async move {
             let mut last: u64 = 0;
             let mut last_time = Instant::now();
             loop {
                 tokio::time::sleep(Duration::from_millis(500)).await;
-                if cancel.load(Ordering::SeqCst) {
+                if cancel.load(Ordering::SeqCst) || task_cancel.load(Ordering::SeqCst) {
                     break;
                 }
                 let (downloaded, total, status, segs) = {
@@ -1070,7 +1073,9 @@ pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle
             t.error = Some(format!("无法连接资源: {}", e));
             mon_cancel.store(true, Ordering::SeqCst);
             let _ = mon.await;
-            notify(&app, &engine, t.clone()).await;
+            let snapshot = t.clone();
+            drop(t);
+            notify(&app, &engine, snapshot).await;
             return;
         }
     };
@@ -1159,7 +1164,8 @@ pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle
         t.segments.clone()
     };
 
-    let mut futs = Vec::new();
+    // 直接并发轮询分片，取消父流程时会一并释放分片请求和文件句柄。
+    let mut futs = futures_util::stream::FuturesUnordered::new();
     for s in segs_snapshot.iter() {
         if s.done {
             continue;
@@ -1175,7 +1181,7 @@ pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle
         let pause_c = handle.pause.clone();
         let limiter_c = handle.limiter.clone();
         let unbounded_c = unbounded;
-        futs.push(tokio::spawn(async move {
+        futs.push(async move {
             download_segment(
                 client,
                 url_c,
@@ -1190,21 +1196,16 @@ pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle
                 limiter_c,
             )
             .await
-        }));
+        });
     }
 
     let mut first_error: Option<String> = None;
-    for f in futs {
-        match f.await {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => {
-                if first_error.is_none() {
-                    first_error = Some(e);
-                }
-            }
+    while let Some(result) = futs.next().await {
+        match result {
+            Ok(()) => {}
             Err(e) => {
                 if first_error.is_none() {
-                    first_error = Some(format!("任务异常: {}", e));
+                    first_error = Some(e);
                 }
             }
         }
@@ -1270,9 +1271,22 @@ pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle
 
 /// 推送单个任务更新 + 任务列表更新
 async fn notify(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>, task: DownloadTask) {
-    let _ = app.emit(format!("download://task/{}", task.id).as_str(), task);
+    let _ = app.emit(format!("download://task/{}", task.id).as_str(), &task);
     let list = engine.snapshot().await;
     let _ = app.emit(EVT_TASKS, list);
+    // 只在实际下载并合并成功后通知；文件已存在而跳过的任务不提醒。
+    if task.status == TaskStatus::Completed && task.error.is_none() {
+        if let Err(error) = crate::notifications::completed(
+            app,
+            &format!("tdm.download.{}", task.id),
+            "下载完成",
+            &format!("{}\n已保存到 {}", task.filename, task.save_path),
+        )
+        .await
+        {
+            eprintln!("发送下载完成通知失败：{error}");
+        }
+    }
 }
 
 /// 所有任务都结束后，按设置执行收尾动作
@@ -1420,9 +1434,15 @@ pub async fn spawn_task(
         let e2 = engine.clone();
         let handle_c = handle.clone();
         let app_c = app.clone();
-        tokio::spawn(async move {
-            run_task(app_c, e2, handle_c).await;
+        let removed = handle.removed.clone();
+        let worker = tokio::spawn(async move {
+            tokio::select! {
+                biased;
+                _ = removed.notified() => {},
+                _ = run_task(app_c, e2, handle_c) => {},
+            }
         });
+        *handle.worker.lock().await = Some(worker);
     }
 
     Ok(task)
@@ -1450,7 +1470,10 @@ pub async fn resume_task(
     };
     {
         let mut t = handle.task.lock().await;
-        if t.status == TaskStatus::Completed || t.status == TaskStatus::Downloading {
+        if t.status == TaskStatus::Completed
+            || t.status.is_active()
+            || t.status == TaskStatus::Pending
+        {
             return Ok(());
         }
         t.status = TaskStatus::Pending;
@@ -1459,9 +1482,16 @@ pub async fn resume_task(
     handle.pause.store(false, Ordering::SeqCst);
     handle.cancel.store(false, Ordering::SeqCst);
     let e2 = engine.clone();
-    tokio::spawn(async move {
-        run_task(app, e2, handle).await;
+    let removed = handle.removed.clone();
+    let handle_c = handle.clone();
+    let worker = tokio::spawn(async move {
+        tokio::select! {
+            biased;
+            _ = removed.notified() => {},
+            _ = run_task(app, e2, handle_c) => {},
+        }
     });
+    *handle.worker.lock().await = Some(worker);
     Ok(())
 }
 
@@ -1506,28 +1536,54 @@ pub async fn cancel_task(engine: &Arc<DownloadEngine>, id: &str) -> Result<(), S
     Ok(())
 }
 
-/// 删除任务（并清理分片/状态文件，可选同时删除已下载文件）
+/// 移除任务；保留本地数据，或将已下载文件及分片移到废纸篓。
 pub async fn remove_task(
     engine: &Arc<DownloadEngine>,
     id: &str,
     delete_file: bool,
 ) -> Result<(), String> {
     let handle = {
-        let mut map = engine.tasks.lock().await;
-        map.remove(id).ok_or_else(|| "任务不存在".to_string())?
+        let map = engine.tasks.lock().await;
+        map.get(id)
+            .cloned()
+            .ok_or_else(|| "任务不存在".to_string())?
     };
     handle.cancel.store(true, Ordering::SeqCst);
     handle.pause.store(true, Ordering::SeqCst);
+    handle.removed.notify_one();
+    if let Some(worker) = handle.worker.lock().await.take() {
+        worker
+            .await
+            .map_err(|error| format!("停止下载失败：{error}"))?;
+    }
 
-    let t = handle.task.lock().await;
-    let n = t.segments.len().max(1);
-    for i in 0..n {
-        let _ = fs::remove_file(part_path(&t.save_path, i));
+    let task = {
+        let mut task = handle.task.lock().await;
+        if task.status != TaskStatus::Completed {
+            task.status = TaskStatus::Cancelled;
+            task.downloaded = task.segments.iter().map(|segment| segment.downloaded).sum();
+            if !delete_file && !task.segments.is_empty() {
+                save_state(&task);
+            }
+        }
+        task.clone()
+    };
+    if delete_file {
+        let mut paths = vec![PathBuf::from(&task.save_path), state_path(&task.save_path)];
+        paths
+            .extend((0..task.segments.len().max(1)).map(|index| part_path(&task.save_path, index)));
+        let paths: Vec<_> = paths
+            .into_iter()
+            .filter(|path| fs::symlink_metadata(path).is_ok())
+            .collect();
+        if !paths.is_empty() {
+            tokio::task::spawn_blocking(move || trash::delete_all(paths))
+                .await
+                .map_err(|error| error.to_string())?
+                .map_err(|error| format!("无法将本地文件移到废纸篓：{error}"))?;
+        }
     }
-    let _ = fs::remove_file(state_path(&t.save_path));
-    if delete_file && !matches!(t.status, TaskStatus::Completed) {
-        let _ = fs::remove_file(PathBuf::from(&t.save_path));
-    }
+    engine.tasks.lock().await.remove(id);
     Ok(())
 }
 
@@ -1544,6 +1600,75 @@ mod tests {
     use super::*;
     use std::io::Read;
     use std::net::TcpListener;
+
+    #[test]
+    fn old_settings_still_require_confirmation_and_keep_local_files() {
+        let old: Settings = serde_json::from_str(r#"{"theme":"light","connections":12}"#).unwrap();
+        assert!(old.confirm_remove_task);
+        assert!(!old.remove_task_files);
+        assert_eq!(old.connections, 12);
+        assert_eq!(old.theme, crate::models::ThemeMode::Light);
+        let remembered = Settings {
+            confirm_remove_task: false,
+            remove_task_files: true,
+            ..old
+        };
+        let restored: Settings =
+            serde_json::from_str(&serde_json::to_string(&remembered).unwrap()).unwrap();
+        assert!(!restored.confirm_remove_task);
+        assert!(restored.remove_task_files);
+    }
+
+    #[tokio::test]
+    async fn removing_waits_for_writes_and_preserves_partial_data_when_requested() {
+        let dir = std::env::temp_dir().join(format!("tdm_remove_keep_{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let save = dir.join("keep.bin").to_string_lossy().into_owned();
+        let engine = Arc::new(DownloadEngine::new());
+        let mut task = make_task("keep", "https://example.com/keep", &save, 20, 1);
+        task.status = TaskStatus::Downloading;
+        let handle = TaskHandle::new(task);
+        let removed = handle.removed.clone();
+        let part = part_path(&save, 0);
+        let worker_part = part.clone();
+        *handle.worker.lock().await = Some(tokio::spawn(async move {
+            removed.notified().await;
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            fs::write(worker_part, b"last chunk").unwrap();
+        }));
+        engine.tasks.lock().await.insert("keep".into(), handle);
+        remove_task(&engine, "keep", false).await.unwrap();
+        assert_eq!(fs::read(&part).unwrap(), b"last chunk");
+        assert!(state_path(&save).exists());
+        assert!(engine.tasks.lock().await.is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn removing_completed_task_can_trash_its_downloaded_file() {
+        let dir = std::env::temp_dir().join(format!("tdm_remove_file_{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let save = dir.join(format!("tdm-delete-test-{}.txt", uuid::Uuid::new_v4()));
+        fs::write(&save, b"temporary test file").unwrap();
+        let engine = Arc::new(DownloadEngine::new());
+        let mut task = make_task(
+            "completed",
+            "https://example.com/file",
+            &save.to_string_lossy(),
+            19,
+            1,
+        );
+        task.status = TaskStatus::Completed;
+        engine
+            .tasks
+            .lock()
+            .await
+            .insert("completed".into(), TaskHandle::new(task));
+        remove_task(&engine, "completed", true).await.unwrap();
+        assert!(!save.exists());
+        assert!(engine.tasks.lock().await.is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     /// 启动一个支持 Range 的极简 HTTP 服务器，返回端口号
     fn start_test_server(data: Vec<u8>) -> u16 {

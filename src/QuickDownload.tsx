@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, EVT_QUICK_OPEN } from "./api";
 import type { QuickOpenContext } from "./api";
+import QuickTaskList from "./QuickTaskList";
+import { DEFAULT_SETTINGS } from "./types";
+import type { ThemeMode } from "./types";
+import { useTheme } from "./useTheme";
 
 const isUrl = (value: string) => {
   try {
@@ -17,23 +21,26 @@ export default function QuickDownload() {
   const [hint, setHint] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"manual" | "clipboard">("manual");
+  const [mode, setMode] = useState<QuickOpenContext["mode"]>("manual");
   const [filename, setFilename] = useState("");
   const field = useRef<HTMLInputElement>(null);
   const refreshId = useRef(0);
+  const [theme, setTheme] = useState<ThemeMode>(DEFAULT_SETTINGS.theme);
+  useTheme(theme);
 
   const refresh = useCallback(async (context: QuickOpenContext) => {
     const id = ++refreshId.current;
     const automatic = context.mode === "clipboard" && Boolean(context.url);
-    setMode(automatic ? "clipboard" : "manual");
+    const nextMode = context.mode === "tasks" ? "tasks" : automatic ? "clipboard" : "manual";
+    setMode(nextMode);
     setFilename(context.filename || "");
     setValue(automatic ? context.url! : "");
     setError("");
     setHint(null);
-    if (!automatic) requestAnimationFrame(() => field.current?.focus());
+    if (nextMode === "manual") requestAnimationFrame(() => field.current?.focus());
     const settings = await api.getSettings().catch(() => null);
-    if (settings) document.documentElement.dataset.theme = settings.theme;
-    if (!automatic) {
+    if (settings) setTheme(settings.theme);
+    if (nextMode === "manual") {
       const clipboardHint = await api.quickClipboardHint().catch(() => null);
       if (id === refreshId.current) setHint(clipboardHint);
     }
@@ -77,6 +84,8 @@ export default function QuickDownload() {
   };
 
   const dismiss = () => { void api.hideQuickWindow(); };
+
+  if (mode === "tasks") return <QuickTaskList />;
 
   return (
     <main className="quick-panel">

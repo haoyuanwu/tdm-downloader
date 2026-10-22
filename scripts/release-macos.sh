@@ -39,6 +39,18 @@ if [[ "$version" != "$tauri_version" ]]; then
   exit 1
 fi
 tag="v$version"
+release_changes="$(node --input-type=module - "$tag" <<'NODE'
+import { readFileSync } from "node:fs";
+const tag = process.argv[2];
+const lines = readFileSync("CHANGELOG.md", "utf8").split(/\r?\n/);
+const start = lines.findIndex(line => line === `## ${tag}` || line.startsWith(`## ${tag} `));
+if (start < 0) throw new Error(`CHANGELOG.md 中缺少 ${tag} 的更新说明`);
+const next = lines.findIndex((line, index) => index > start && line.startsWith("## "));
+const changes = lines.slice(start + 1, next < 0 ? undefined : next).join("\n").trim();
+if (!changes) throw new Error(`${tag} 的更新说明为空`);
+process.stdout.write(changes);
+NODE
+)"
 commit="$(git rev-parse HEAD)"
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   if [[ "$(git rev-parse "$tag^{commit}")" != "$commit" ]]; then
@@ -97,7 +109,7 @@ trap 'rm -f "$notes_file"' EXIT
 cat > "$notes_file" <<EOF
 ## TDM Downloader $tag
 
-本版本加入 macOS 支持。菜单栏弹窗可手动输入下载地址，也会在复制可下载链接时提示是否下载；主窗口隐藏时同步隐藏 Dock 图标。
+$release_changes
 
 | 文件 | 适用 Mac | SHA256 |
 | --- | --- | --- |

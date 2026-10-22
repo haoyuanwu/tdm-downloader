@@ -1,6 +1,6 @@
 [package]
 name = "tdm-downloader"
-version = "0.2.3"
+version = "0.2.4"
 description = "A fast multi-threaded download manager built with Tauri 2"
 authors = ["you"]
 edition = "2021"
@@ -10,6 +10,7 @@ name = "tdm_downloader_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
+cc = "1.9.0"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
@@ -26,6 +27,8 @@ url = "2"
 percent-encoding = "2"
 chrono = { version = "0.4.41", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+tauri-plugin-notification = "2"
+trash = "5"
 
 # Windows: 读取系统代理（Internet Settings 注册表）
 [target.'cfg(windows)'.dependencies]

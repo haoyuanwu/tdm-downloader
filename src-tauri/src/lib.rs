@@ -5,6 +5,9 @@
 mod clipboard;
 pub mod engine;
 pub mod models;
+mod notifications;
+mod popup_position;
+mod tray_progress;
 
 use engine::DownloadEngine;
 use models::{AppInfo, DownloadTask, NewTaskRequest, ProbeInfo, Settings};
@@ -26,7 +29,10 @@ struct QuickOpenPayload {
 }
 
 #[derive(Default)]
-struct QuickWindowState(std::sync::Mutex<QuickOpenPayload>);
+struct QuickWindowState(
+    std::sync::Mutex<QuickOpenPayload>,
+    std::sync::Mutex<Option<popup_position::Rect>>,
+);
 
 /// 新建下载任务
 #[tauri::command]
@@ -153,9 +159,9 @@ async fn save_settings(
 ) -> Result<(), String> {
     {
         let mut s = state.settings.lock().await;
+        engine::persist_settings(&settings)?;
         *s = settings.clone();
     }
-    engine::persist_settings(&settings);
     Ok(())
 }
 
@@ -289,9 +295,11 @@ fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     let _ = hide_quick_window(app.clone());
     show_dock(&app);
     if let Some(w) = app.get_webview_window("main") {
-        let _ = w.unminimize();
-        let _ = w.show();
-        let _ = w.set_focus();
+        w.unminimize().map_err(|error| error.to_string())?;
+        w.show().map_err(|error| error.to_string())?;
+        #[cfg(target_os = "macos")]
+        app.show().map_err(|error| error.to_string())?;
+        w.set_focus().map_err(|error| error.to_string())?;
     }
     Ok(())
 }
@@ -332,6 +340,11 @@ fn quick_open_context(app: tauri::AppHandle) -> QuickOpenPayload {
         .lock()
         .map(|state| state.clone())
         .unwrap_or_default()
+}
+
+#[tauri::command]
+fn show_quick_input(app: tauri::AppHandle) {
+    show_quick_window(&app, None);
 }
 
 #[tauri::command]
@@ -446,9 +459,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(engine)
         .manage(ClipboardState::default())
         .manage(QuickWindowState::default())
+        .manage(tray_progress::TrayProgressState::default())
+        .manage(notifications::NotificationState::default())
         .invoke_handler(tauri::generate_handler![
             start_download,
             list_tasks,
@@ -475,7 +491,11 @@ pub fn run() {
             copy_text,
             quick_clipboard_hint,
             quick_open_context,
+            show_quick_input,
             hide_quick_window,
+            notifications::notification_status,
+            notifications::test_download_notification,
+            notifications::open_notification_settings,
         ])
         .setup(|app| {
             tauri::WebviewWindowBuilder::new(
@@ -493,6 +513,8 @@ pub fn run() {
             .build()?;
             build_tray(app)?;
             tauri::async_runtime::spawn(clipboard::monitor(app.handle().clone()));
+            tauri::async_runtime::spawn(tray_progress::monitor(app.handle().clone()));
+            tauri::async_runtime::spawn(notifications::initialize(app.handle().clone()));
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -585,29 +607,26 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         // 关掉它，约定：左键 = 显示/隐藏窗口，右键 = 弹出菜单。
         let _ = tray.set_show_menu_on_left_click(false);
         tray.on_tray_icon_event(move |_tray, e| {
-            // 左键打开快速下载窗口；右键保留任务管理菜单。
+            // 左键打开下载列表或快速输入，右键保留任务管理菜单。
             // 右键点击由系统弹出托盘菜单，此时绝不能 show/set_focus 主窗口，
             // 否则主窗口会抢走焦点，导致刚弹出的菜单瞬间消失（表现为闪一下就没了）。
-            let left_click = matches!(
-                e,
+            let clicked_rect = match e {
                 TrayIconEvent::Click {
                     button: MouseButton::Left,
                     button_state: MouseButtonState::Up,
+                    rect,
                     ..
                 }
-            );
-            // 左键双击：展开窗口（双击时至少会收到一次 Click，这里只做兜底）
-            let left_dbl = matches!(
-                e,
-                TrayIconEvent::DoubleClick {
+                | TrayIconEvent::DoubleClick {
                     button: MouseButton::Left,
+                    rect,
                     ..
-                }
-            );
-            if !left_click && !left_dbl {
-                return;
-            }
-            toggle_quick_window(&handle);
+                } => rect,
+                _ => return,
+            };
+            // 使用本次事件的图标矩形，避免 tray.rect() 返回另一屏菜单栏的缓存位置。
+            let anchor = popup_position::resolve(&handle, Some(clicked_rect));
+            toggle_quick_window(&handle, anchor);
         });
     }
 
@@ -638,22 +657,49 @@ fn show_clipboard_candidate(app: &tauri::AppHandle, candidate: clipboard::Clipbo
     show_quick_window(app, Some(candidate));
 }
 
-fn toggle_quick_window(app: &tauri::AppHandle) {
+fn toggle_quick_window(app: &tauri::AppHandle, anchor: Option<popup_position::Anchor>) {
     if let Some(w) = app.get_webview_window("quick") {
-        if w.is_visible().unwrap_or(false) {
-            let clipboard_mode = app
-                .state::<QuickWindowState>()
-                .0
-                .lock()
-                .map(|current| current.mode == "clipboard")
-                .unwrap_or(false);
-            if clipboard_mode {
-                show_quick_window(app, None);
-            } else {
-                let _ = hide_quick_window(app.clone());
-            }
+        let show_tasks = app
+            .state::<tray_progress::TrayProgressState>()
+            .has_tasks
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let current_mode = app
+            .state::<QuickWindowState>()
+            .0
+            .lock()
+            .map(|current| current.mode.clone())
+            .unwrap_or_default();
+        let already_open = if show_tasks {
+            current_mode == "tasks"
         } else {
-            show_quick_window(app, None);
+            current_mode == "manual"
+        };
+        let same_screen = app
+            .state::<QuickWindowState>()
+            .1
+            .lock()
+            .map(|previous| anchor.map(|a| Some(a.bounds) == *previous).unwrap_or(true))
+            .unwrap_or(false);
+        if w.is_visible().unwrap_or(false) && already_open && same_screen {
+            let _ = hide_quick_window(app.clone());
+        } else if show_tasks {
+            present_quick_window_at(
+                app,
+                QuickOpenPayload {
+                    mode: "tasks".into(),
+                    ..Default::default()
+                },
+                anchor,
+            );
+        } else {
+            present_quick_window_at(
+                app,
+                QuickOpenPayload {
+                    mode: "manual".into(),
+                    ..Default::default()
+                },
+                anchor,
+            );
         }
     }
 }
@@ -670,21 +716,41 @@ fn show_quick_window(app: &tauri::AppHandle, candidate: Option<clipboard::Clipbo
             ..Default::default()
         },
     };
+    present_quick_window(app, payload);
+}
+
+fn present_quick_window(app: &tauri::AppHandle, payload: QuickOpenPayload) {
+    let handle = app.clone();
+    // 剪贴板监控来自后台任务，AppKit 屏幕查询及窗口定位统一放到主线程。
+    let _ = app.run_on_main_thread(move || {
+        let anchor = popup_position::resolve(&handle, None);
+        present_quick_window_at(&handle, payload, anchor);
+    });
+}
+
+fn present_quick_window_at(
+    app: &tauri::AppHandle,
+    payload: QuickOpenPayload,
+    anchor: Option<popup_position::Anchor>,
+) {
     if let Ok(mut current) = app.state::<QuickWindowState>().0.lock() {
         *current = payload.clone();
     }
     let Some(w) = app.get_webview_window("quick") else {
         return;
     };
-    if let Some(tray) = app.tray_by_id("main") {
-        if let Ok(Some(rect)) = tray.rect() {
-            let scale = w.scale_factor().unwrap_or(1.0);
-            let position = rect.position.to_physical::<f64>(scale);
-            let size = rect.size.to_physical::<f64>(scale);
-            let x = position.x + size.width / 2.0 - 190.0 * scale;
-            let y = position.y + size.height + 6.0 * scale;
-            let _ = w.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+    let height = if payload.mode == "tasks" {
+        390.0
+    } else {
+        174.0
+    };
+    if let Some(anchor) = anchor {
+        popup_position::apply(&w, anchor, height);
+        if let Ok(mut previous) = app.state::<QuickWindowState>().1.lock() {
+            *previous = Some(anchor.bounds);
         }
+    } else {
+        let _ = w.set_size(tauri::LogicalSize::new(380.0, height));
     }
     let _ = w.show();
     let _ = w.set_focus();
