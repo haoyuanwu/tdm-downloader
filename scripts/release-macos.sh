@@ -54,7 +54,8 @@ build_dmg() {
   echo "正在构建 $label ($target)……"
   npm run tauri -- build --target "$target" --bundles dmg --ci --no-sign
 
-  app_binary="$bundle_dir/macos/TDM Downloader.app/Contents/MacOS/tdm-downloader"
+  # Tauri 生成 DMG 后会清理临时 .app，发布版可执行文件仍保留在 release/。
+  app_binary="src-tauri/target/$target/release/tdm-downloader"
   [[ -f "$app_binary" ]] || { echo "找不到应用可执行文件：$app_binary" >&2; exit 1; }
   actual_arch="$(lipo -archs "$app_binary")"
   if [[ "$actual_arch" != "$label" ]]; then
