@@ -551,6 +551,7 @@ pub fn run() {
         ])
         .setup(|app| {
             extension_manager::refresh_app_path();
+            safari_extension::refresh_registered_copy();
             tauri::WebviewWindowBuilder::new(
                 app,
                 "quick",

@@ -15,7 +15,13 @@
     <p class="state-unknown">在 Safari 扩展设置中启用「TDM 下载助手」，再允许访问需要下载的网站。</p>
     <p class="state-on">扩展已启用。允许访问下载网站并刷新网页，即可点击文件链接或使用右键菜单交给 TDM 下载。</p>
     <p class="state-off">扩展尚未启用。打开 Safari 扩展设置，勾选「TDM 下载助手」。</p>
-    <button class="open-preferences">打开 Safari 扩展设置</button>
+    <p id="setup-help" role="status" hidden></p>
+    <div class="setup-actions">
+        <button class="open-preferences">打开 Safari 扩展设置</button>
+        <button class="open-safari">打开 Safari</button>
+        <button class="refresh-state">重新检查</button>
+    </div>
+    <details class="unsigned-help"><summary>扩展列表里没有「TDM 下载助手」？</summary><ol><li>在 Safari → 设置 → 高级中开启「显示网页开发者功能」（旧版为「在菜单栏中显示开发菜单」）。</li><li>在 Safari「开发」菜单或开发者设置中手动允许未签名的扩展。</li><li>返回 Safari → 设置 → 扩展，启用 TDM 下载助手，并允许所需网站。</li><li>返回本安装器点击「重新检查」。重启 Safari 后可能需要重新允许未签名扩展。</li></ol></details>
     <p class="install-hint">临时签名试用版：若扩展没有出现，请在 Safari 的「开发」菜单中允许未签名的扩展。完整教程见 TDM → 设置 → 浏览器扩展。</p>
 </body>
 </html>

@@ -63,3 +63,9 @@ cd src-tauri && cargo test --lib browser_bridge
 - Chrome：先启用扩展并安装本地连接器，按 **Shift + Command + D** 打开助手（Windows/Linux 为 Ctrl + Shift + D），或从工具栏拼图菜单打开并固定「TDM 下载助手」。
 - 快捷键只打开助手弹窗，不会绕过浏览器首次启用步骤。Chrome 旧版快捷键或冲突可在 `chrome://extensions/shortcuts` 中调整「激活此扩展程序」。
 - 扩展 0.1.1 修复 Safari 右键菜单中文编码并重建缓存菜单；更新后重新载入扩展或重启 Safari，再刷新网页。
+
+## Safari 删除后的重新安装与同名副本
+
+在新版 TDM「设置 → 浏览器扩展 → Safari」点击打开扩展安装器，会将安装器放在固定位置 `~/Applications/TDM Safari Connector.app`，并清理其他路径的同 ID 扩展注册。不会删除其他扩展，也不会自动更改 Safari 的启用权限。
+
+如果之前已经删除扩展，需要按教程重新允许临时签名扩展并启用「TDM 下载助手」。`SFErrorDomain 1` 表示 Safari 尚未找到可用扩展，可点击「打开 Safari」，按 ⌘, 进入设置 → 扩展，完成启用后返回安装器点击「重新检查」。安装器 0.1.3 与扩展 0.1.2 分别维护版本。

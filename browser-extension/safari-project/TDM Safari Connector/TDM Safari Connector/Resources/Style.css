@@ -49,3 +49,11 @@ p { max-width:460px; line-height:1.6; margin:0; }
 button { padding:10px 20px; border-radius:8px; cursor:pointer; }
 .install-hint { opacity:.65; font-size:12px; }
 img { width:80px; height:80px; }
+
+html { min-height:100%; height:auto; }
+body { min-height:100vh; height:auto; padding:28px 0; box-sizing:border-box; gap:16px; }
+.setup-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+#setup-help { font-size:13px; line-height:1.7; padding:12px; background:rgba(128,128,128,.12); border-radius:8px; }
+.unsigned-help { max-width:460px; font-size:12px; line-height:1.7; text-align:left; }
+.unsigned-help summary { cursor:pointer; font-weight:600; }
+.unsigned-help ol { padding-left:20px; }
