@@ -978,3 +978,17 @@ h1 > span { display: inline-flex; vertical-align: middle; padding: 3px 8px; marg
 .browser-download-url { padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:12px; line-height:1.7; overflow-wrap:anywhere; user-select:text; max-height:140px; overflow:auto; }
 
 .browser-download-overlay { z-index:2000; }
+
+.quick-task-menu { position:fixed; z-index:3000; width:188px; padding:5px; border:1px solid var(--border); border-radius:9px; background:var(--bg-elev); box-shadow:0 8px 28px #0003; }
+.quick-task-menu button { display:block; width:100%; border:0; background:transparent; color:var(--text); text-align:left; font:inherit; font-size:12px; padding:8px 10px; border-radius:5px; cursor:pointer; }
+.quick-task-menu button:hover:not(:disabled), .quick-task-menu button:focus-visible { background:var(--accent-soft); outline:2px solid var(--accent); outline-offset:-2px; }
+.quick-task-menu button:disabled { opacity:.4; cursor:default; }
+.quick-task-menu .is-danger { color:var(--danger); border-top:1px solid var(--border); }
+.quick-remove-dialog .modal-overlay { padding:10px; }
+.quick-remove-dialog .remove-dialog { width:100%; max-height:calc(100vh - 20px); overflow:auto; padding:16px; box-sizing:border-box; }
+.quick-remove-dialog .remove-dialog h2 { font-size:16px; }
+.quick-remove-dialog .remove-question { margin:8px 0; }
+.quick-remove-dialog .remove-files { margin:6px 0; max-height:36px; }
+.quick-remove-dialog .remove-options label { padding:8px; gap:8px; }
+.quick-remove-dialog .remove-remember { font-size:12px; margin:8px 0; }
+.quick-remove-dialog .modal-footer { margin-top:10px; padding-top:10px; }

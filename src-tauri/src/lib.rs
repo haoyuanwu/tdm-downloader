@@ -5,6 +5,7 @@
 mod clipboard;
 mod browser_bridge;
 mod browser_dialog;
+mod task_files;
 mod safari_extension;
 mod extension_manager;
 pub mod engine;
@@ -402,6 +403,7 @@ fn show_quick_input(app: tauri::AppHandle) {
 #[tauri::command]
 fn hide_quick_window(app: tauri::AppHandle) -> Result<(), String> {
     trace_quick_window(&app, "hide");
+    app.state::<task_files::QuickInteraction>().0.store(false, std::sync::atomic::Ordering::Release);
     app.state::<BrowserWakeState>().0.store(false, std::sync::atomic::Ordering::Release);
     app.state::<QuickWindowState>().3.store(false, std::sync::atomic::Ordering::Release);
     let pending = app.state::<QuickWindowState>().0.lock().ok().and_then(|state| state.request_id.clone());
@@ -527,6 +529,7 @@ pub fn run() {
         .manage(engine)
         .manage(ClipboardState::default())
         .manage(BrowserWakeState::default())
+        .manage(task_files::QuickInteraction::default())
         .manage(browser_dialog::BrowserDialogState::default())
         .manage(QuickWindowState::default())
         .manage(tray_progress::TrayProgressState::default())
@@ -545,6 +548,9 @@ pub fn run() {
             open_download_dir,
             pick_directory,
             open_path,
+            task_files::reveal_task_file,
+            task_files::save_task_as,
+            task_files::quick_task_interaction,
             probe_url,
             pause_all,
             resume_all,
@@ -637,7 +643,8 @@ pub fn run() {
                         tauri::WindowEvent::Focused(false) => {
                             // Browser confirmation requires an explicit choice;
                             // activation races or switching apps must not cancel it.
-                            if !app.state::<BrowserWakeState>().0.load(std::sync::atomic::Ordering::Acquire) {
+                            if !app.state::<BrowserWakeState>().0.load(std::sync::atomic::Ordering::Acquire)
+                                && !app.state::<task_files::QuickInteraction>().0.load(std::sync::atomic::Ordering::Acquire) {
                                 let _ = hide_quick_window(app.clone());
                             }
                         }

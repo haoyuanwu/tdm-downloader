@@ -43,6 +43,9 @@ export interface BrowserExtensionStatus {
 }
 
 export const api = {
+  revealTaskFile: (id: string) => invoke<void>("reveal_task_file", { id }),
+  saveTaskAs: (id: string) => invoke<string | null>("save_task_as", { id }),
+  quickTaskInteraction: (active: boolean) => invoke<void>("quick_task_interaction", { active }),
   browserDialogContext: () => invoke<{ id: number; payload: QuickOpenContext } | null>("browser_dialog_context"),
   finishBrowserDialog: (id: number, accepted: boolean) => invoke<void>("finish_browser_dialog", { id, accepted }),
   quickWindowReady: () => invoke<void>("quick_window_ready"),
