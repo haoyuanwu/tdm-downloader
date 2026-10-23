@@ -129,7 +129,7 @@ $release_changes
 | $(basename "$x86_dmg") | Intel (x86_64) | $x86_sha |
 | $(basename "$extension_zip") | Chrome 扩展与 macOS 本地连接器 | $extension_sha |
 
-Safari 扩展安装器随 DMG 内的应用提供，入口：设置 → 浏览器扩展。Chrome 请解压扩展压缩包，按应用教程加载 browser-extension/chrome，并使用 scripts/install-chrome-bridge.sh 安装连接器（需要 Xcode Command Line Tools 和 Python 3）。浏览器内默认按 Shift + Command + D 打开助手弹窗；临时签名 Safari 扩展需手动启用，部分版本需允许未签名扩展。
+Safari 扩展安装器随 DMG 内的应用提供，入口：设置 → 浏览器扩展。Chrome 请解压扩展压缩包，按应用教程加载 browser-extension/chrome，并使用 scripts/install-chrome-bridge.sh 安装连接器（需要 Xcode Command Line Tools 和 Python 3）。浏览器内默认按 Shift + Command + D 打开助手弹窗；Safari 扩展需手动启用；临时签名在 Safari 27 中可能不被列出，即使已允许未签名扩展。本机测试需要 Apple Development 签名，公开默认可用仍需 Developer ID 发行签名及公证。已安装的可用证书签名扩展会保留。
 
 应用采用完整应用包临时签名（ad-hoc），已验证包内签名完整性；未进行 Developer ID 发行签名和 Apple 公证。首次打开时仍可能需要在系统设置的“隐私与安全性”中允许运行。
 EOF

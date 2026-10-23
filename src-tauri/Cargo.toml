@@ -1,6 +1,6 @@
 [package]
 name = "tdm-downloader"
-version = "0.2.11"
+version = "0.3.0"
 description = "A fast multi-threaded download manager built with Tauri 2"
 authors = ["you"]
 edition = "2021"

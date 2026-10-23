@@ -8,11 +8,11 @@
 
 Windows 适配说明与两端功能差异见 [WINDOWS.md](WINDOWS.md)。
 
-下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Downloader_0.2.7_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Downloader_0.2.7_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
+下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
 
 ## 浏览器扩展
 
-Chrome 扩展与 macOS 连接器：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Browser-Extensions_0.2.7.zip)。Safari 扩展安装器随 macOS 应用提供。启用步骤见软件「设置 → 浏览器扩展」及 [扩展说明](browser-extension/README.md)。默认按 Shift + Command + D 打开助手弹窗。
+Chrome 扩展与 macOS 连接器：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Browser-Extensions_0.3.0.zip)。Safari 扩展安装器随 macOS 应用提供。启用步骤见软件「设置 → 浏览器扩展」及 [扩展说明](browser-extension/README.md)。默认按 Shift + Command + D 打开助手弹窗。
 
 ## 特性
 
