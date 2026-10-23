@@ -1,7 +1,7 @@
 {
   "name": "tdm-downloader",
   "private": true,
-  "version": "0.2.7",
+  "version": "0.2.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "package": "tauri build && node scripts/rename-artifacts.mjs",
     "package:prefix": "tauri build && node scripts/rename-artifacts.mjs --prefix=TDM-Downloader",
-    "release:macos": "bash scripts/release-macos.sh"
+    "release:macos": "bash scripts/release-macos.sh",
+    "package:macos": "bash scripts/build-macos.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

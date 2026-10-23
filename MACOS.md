@@ -4,14 +4,26 @@
 
 ## 构建
 
-需要 macOS 12+、Xcode Command Line Tools、Rust 1.99+ 和 Node.js 22+。
+需要 macOS 12+、完整 Xcode、Rust 1.99+ 和 Node.js 22+。
+
+### 本地打包安装（推荐）
+
+双击项目根目录的 **打包macOS.command** 即可打包当前 Mac 架构。也可以在项目目录执行：
 
 ```sh
-npm ci
-npm run tauri build
+npm run package:macos                 # 当前 Mac 架构
+npm run package:macos -- arm64        # Apple 芯片
+npm run package:macos -- x86_64       # Intel
+npm run package:macos -- all          # 两种架构
 ```
 
-生成的应用在 `src-tauri/target/release/bundle/macos/TDM Downloader.app`，磁盘映像在 `src-tauri/target/release/bundle/dmg/`。开发时运行 `npm run tauri dev`。
+首次需要完整 Xcode（用于构建 Safari 扩展）、Rust 与 Node.js；脚本会在缺少 Node 依赖时执行 npm ci，安装对应 Rust 目标，再构建界面、Safari 扩展与 Chrome 连接器。无需 GitHub 登录、提交记录或干净工作区。
+
+输出在 **release/packages/**。打开对应 DMG，将应用拖入 Applications 并替换旧版；安装后先打开一次新版，软件会同步 Chrome 连接器目标。插件版本不变时不用重新加载插件。
+
+此脚本不会自动安装或上传，也不会弹出 Finder 安装窗口。应用使用临时签名，尚未进行 Developer ID 签名与 Apple 公证。
+
+开发时运行 `npm run tauri dev`；本地打包完成后可直接双击 DMG 安装，无需开发服务器。
 
 ## 发布到 GitHub
 
