@@ -148,7 +148,9 @@ async fn clear_completed(
 /// 获取设置
 #[tauri::command]
 async fn get_settings(state: tauri::State<'_, Arc<DownloadEngine>>) -> Result<Settings, String> {
-    Ok(state.settings.lock().await.clone())
+    let mut settings = state.settings.lock().await.clone();
+    settings.autostart = get_autostart()?;
+    Ok(settings)
 }
 
 /// 保存设置
@@ -159,7 +161,12 @@ async fn save_settings(
 ) -> Result<(), String> {
     {
         let mut s = state.settings.lock().await;
-        engine::persist_settings(&settings)?;
+        let previous_startup = get_autostart()?;
+        set_autostart(settings.autostart)?;
+        if let Err(error) = engine::persist_settings(&settings) {
+            let _ = set_autostart(previous_startup);
+            return Err(error);
+        }
         *s = settings.clone();
     }
     Ok(())
@@ -378,7 +385,7 @@ fn set_autostart(enabled: bool) -> Result<(), String> {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         #[cfg(target_os = "windows")]
         {
-            let content = format!("@echo off\r\nstart \"\" \"{}\"\r\n", exe.display());
+            let content = format!("@echo off\r\nstart \"\" \"{}\" --autostart\r\n", exe.display());
             return std::fs::write(&p, content).map_err(|e| e.to_string());
         }
         #[cfg(target_os = "macos")]
@@ -390,7 +397,7 @@ fn set_autostart(enabled: bool) -> Result<(), String> {
                 .replace('>', "&gt;")
                 .replace('"', "&quot;")
                 .replace('\'', "&apos;");
-            let content = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>com.tdm.downloader</string><key>ProgramArguments</key><array><string>{escaped}</string></array><key>RunAtLoad</key><true/></dict></plist>\n");
+            let content = format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>com.tdm.downloader</string><key>ProgramArguments</key><array><string>{escaped}</string><string>--autostart</string></array><key>RunAtLoad</key><true/></dict></plist>\n");
             std::fs::write(&p, content).map_err(|e| e.to_string())?;
             // Login agents are loaded automatically on the next login.
             return Ok(());
@@ -405,8 +412,8 @@ fn set_autostart(enabled: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_autostart() -> bool {
-    autostart_file().map(|p| p.exists()).unwrap_or(false)
+fn get_autostart() -> Result<bool, String> {
+    Ok(autostart_file()?.exists())
 }
 
 /// 平台对应的登录启动项路径
@@ -512,6 +519,13 @@ pub fn run() {
             .visible(false)
             .build()?;
             build_tray(app)?;
+            let login_launch = std::env::args().any(|argument| argument == "--autostart");
+            let background = app.state::<Arc<DownloadEngine>>().settings.try_lock()
+                .map(|settings| settings.startup_hidden).unwrap_or(true);
+            if login_launch && background {
+                if let Some(window) = app.get_webview_window("main") { let _ = window.hide(); }
+                hide_dock(app.handle());
+            }
             tauri::async_runtime::spawn(clipboard::monitor(app.handle().clone()));
             tauri::async_runtime::spawn(tray_progress::monitor(app.handle().clone()));
             tauri::async_runtime::spawn(notifications::initialize(app.handle().clone()));

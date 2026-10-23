@@ -1,3 +1,4 @@
+import { Icon } from "./components/Icon";
 import { useEffect, useState } from "react";
 import { api, onProgress, onTasks } from "./api";
 import type { DownloadTask } from "./types";
@@ -39,12 +40,12 @@ export default function QuickTaskList() {
   return (
     <main className="quick-panel quick-downloads">
       <div className="quick-heading">
-        <div className="quick-mark" aria-hidden="true">↓</div>
+        <div className="quick-mark" aria-hidden="true"><Icon name="download" size={19} /></div>
         <div>
           <strong>下载列表</strong>
           <span>{count ? `${count} 个任务进行中` : "没有正在下载的任务"}</span>
         </div>
-        <button className="quick-close" aria-label="关闭" onClick={() => void api.hideQuickWindow()}>×</button>
+        <button className="quick-close" aria-label="关闭" onClick={() => void api.hideQuickWindow()}><Icon name="close" size={18} /></button>
       </div>
       <div className="quick-task-list" aria-label="下载任务">
         {error && <p className="quick-error" role="alert">{error}</p>}

@@ -37,7 +37,7 @@ lipo -archs "/Applications/TDM Downloader.app/Contents/MacOS/tdm-downloader"
 
 - 默认下载到 `~/Downloads`，设置保存在 `~/Library/Application Support/tdm-downloader/settings.json`。
 - “在 Finder 中打开”使用系统 `open` 命令。
-- “开机自动启动”写入当前用户的 `~/Library/LaunchAgents/com.tdm.downloader.plist`，在下次登录时生效。移动应用后需要重新打开设置并切换一次该选项。
+- “设置 → 启动与通知 → 开机自动启动”写入当前用户的 `~/Library/LaunchAgents/com.tdm.downloader.plist`，在下次登录时生效；可选择登录后仅在菜单栏后台运行，手动打开应用仍会显示主窗口。保存失败会显示错误，开关会读取真实启动项状态。移动应用后需要重新打开设置并切换一次该选项。
 - “跟随系统代理”读取当前 macOS 网络配置的 HTTP/HTTPS 手动代理。PAC 自动配置无法由下载引擎直接解析；使用 PAC 时，可在设置中填写代理服务器地址。
 - 关闭窗口可继续在菜单栏运行；使用菜单栏的“退出”才会完全结束。
 - 菜单栏仅显示图标。开始下载后显示进度圆环，中央数字表示下载、连接、排队和合并中的任务数，每 3 秒切换一个任务的进度；大小未知的下载显示旋转圆弧。点击图标可打开显示名称、进度和速度的下载列表，列表中可新建下载或打开主窗口。所有进行中任务结束后恢复默认图标。

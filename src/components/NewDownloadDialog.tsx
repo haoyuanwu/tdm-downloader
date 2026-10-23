@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Icon } from "./Icon";
+import { useDialog } from "../useDialog";
 import { api } from "../api";
 import type { NewTaskRequest, ProbeInfo, Settings } from "../types";
 import { formatBytes } from "../types";
@@ -34,7 +36,8 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
   const [probing, setProbing] = useState(false);
   const timerRef = useRef<number | undefined>(undefined);
 
-  const urls = parseUrls(text);
+  const dialog = useDialog(onClose);
+  const urls = useMemo(() => parseUrls(text), [text]);
   const single = urls.length === 1;
 
   // ── URL 预解析（防抖 700ms，只解析第一个链接）──
@@ -114,15 +117,15 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>新建下载任务</h2>
+      <div ref={dialog} className="modal new-download-dialog" role="dialog" aria-modal="true" aria-labelledby="new-download-title" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-header"><div><h2 id="new-download-title">新建下载</h2><p className="dialog-subtitle">添加链接，剩下的交给 TDM</p></div><button className="btn settings-close" aria-label="关闭新建下载" onClick={onClose}><Icon name="close" size={18} /></button></div>
 
         <div className="field">
-          <label>下载链接（每行一个，可一次粘贴多个）</label>
-          <textarea
+          <label htmlFor="download-field-1">下载链接（每行一个，可一次粘贴多个）</label>
+          <textarea id="download-field-1"
             className="url-area"
             value={text}
-            autoFocus
+            data-initial-focus
             rows={3}
             placeholder={"https://example.com/file.zip\nhttps://example.com/other.iso"}
             onChange={(e) => setText(e.target.value)}
@@ -157,9 +160,9 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
         )}
 
         <div className="field">
-          <label>保存到</label>
+          <label htmlFor="download-field-2">保存到</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <input
+            <input id="download-field-2"
               type="text"
               value={dir}
               onChange={(e) => setDir(e.target.value)}
@@ -172,8 +175,8 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
         </div>
 
         <div className="field">
-          <label>文件名（留空自动推断）</label>
-          <input
+          <label htmlFor="download-field-3">文件名（留空自动推断）</label>
+          <input id="download-field-3"
             type="text"
             value={filename}
             placeholder={single ? "自动推断" : "批量下载时逐个自动推断"}
@@ -184,8 +187,8 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
 
         <div className="field-row">
           <div className="field">
-            <label>连接数（线程）</label>
-            <input
+            <label htmlFor="download-field-4">连接数（线程）</label>
+            <input id="download-field-4"
               type="number"
               min={1}
               max={32}
@@ -194,8 +197,8 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
             />
           </div>
           <div className="field">
-            <label>限速 KB/s（0 = 不限）</label>
-            <input
+            <label htmlFor="download-field-5">限速 KB/s（0 = 不限）</label>
+            <input id="download-field-5"
               type="number"
               min={0}
               value={speedLimitKb}
@@ -204,15 +207,13 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
           </div>
         </div>
 
-        <div className="checkbox-row" onClick={() => setShowAdvanced((v) => !v)}>
-          <span className="link">{showAdvanced ? "▾" : "▸"} 高级选项</span>
-        </div>
+        <button className="advanced-toggle" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((v) => !v)}><Icon name="chevron" size={16} style={{ transform: showAdvanced ? "rotate(180deg)" : undefined }} />高级选项<span>请求头、限速与启动方式</span></button>
 
         {showAdvanced && (
           <div className="advanced">
             <div className="field">
-              <label>User-Agent（留空使用全局设置）</label>
-              <input
+              <label htmlFor="download-field-6">User-Agent（留空使用全局设置）</label>
+              <input id="download-field-6"
                 type="text"
                 value={userAgent}
                 placeholder={settings.user_agent || "默认"}
@@ -221,8 +222,8 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
             </div>
             <div className="field-row">
               <div className="field">
-                <label>Referer</label>
-                <input
+                <label htmlFor="download-field-7">Referer</label>
+                <input id="download-field-7"
                   type="text"
                   value={referer}
                   placeholder="https://"
@@ -230,8 +231,8 @@ export function NewDownloadDialog({ settings, defaultUrl, onClose, onSubmit }: P
                 />
               </div>
               <div className="field">
-                <label>Cookie</label>
-                <input
+                <label htmlFor="download-field-8">Cookie</label>
+                <input id="download-field-8"
                   type="text"
                   value={cookie}
                   placeholder="name=value; ..."

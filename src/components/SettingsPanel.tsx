@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { Icon } from "./Icon";
+import type { IconName } from "./Icon";
+import { useDialog } from "../useDialog";
 import type { NotificationStatus } from "../api";
 import type {
   AfterFinishAction,
@@ -40,29 +43,29 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
   const [form, setForm] = useState<Settings>({ ...settings });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [autostart, setAutostart] = useState(false);
+  const [section, setSection] = useState("appearance");
+  const [startupReady, setStartupReady] = useState(false);
+  const [startupError, setStartupError] = useState("");
+  const dialog = useDialog(onClose, saving);
+  const loadStartup = useCallback(() => {
+    setStartupReady(false);
+    setStartupError("");
+    void api.getAutostart().then((enabled) => {
+      setForm((previous) => ({ ...previous, autostart: enabled }));
+      setStartupReady(true);
+    }).catch((error) => setStartupError(`读取开机启动状态失败：${String(error)}`));
+  }, []);
   const [notification, setNotification] = useState<NotificationStatus | null>(null);
   const [notificationMessage, setNotificationMessage] = useState("");
   const [testingNotification, setTestingNotification] = useState(false);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !saving && !event.defaultPrevented) {
-        event.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, saving]);
-
-  useEffect(() => {
-    api.getAutostart().then(setAutostart).catch(() => {});
+    loadStartup();
     const refresh = () => { void api.notificationStatus().then(setNotification).catch((error) => setNotificationMessage(String(error))); };
     refresh();
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
-  }, []);
+  }, [loadStartup]);
 
   const testNotification = async () => {
     setTestingNotification(true);
@@ -103,7 +106,6 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
     setSaveError("");
     try {
       await api.saveSettings(form);
-      await api.setAutostart(autostart);
       onSaved(form);
       onClose();
     } catch (e) {
@@ -115,39 +117,43 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
 
   return (
     <div className="modal-overlay" onClick={() => { if (!saving) onClose(); }}>
-      <div className="modal modal-wide settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialog} className="modal modal-wide settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
-          <h2 id="settings-title">设置</h2>
+          <div><h2 id="settings-title">偏好设置</h2><p className="dialog-subtitle">让下载器更贴合你的工作方式</p></div>
           <button type="button" className="btn settings-close" aria-label="关闭设置" title="关闭（Esc）" onClick={onClose} disabled={saving}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
+            <Icon name="close" size={18} />
           </button>
         </div>
 
-        <div className="settings-body">
-          <section>
+        <div className="settings-layout">
+          <nav className="settings-nav" aria-label="设置分类">
+            {([
+              ["appearance", "外观", "monitor"], ["downloads", "下载", "download"],
+              ["network", "网络", "globe"], ["system", "启动与通知", "power"],
+            ] as [string, string, IconName][]).map(([id, label, icon]) => <button key={id} className={section === id ? "is-active" : ""} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}><Icon name={icon} size={18} />{label}</button>)}
+          </nav>
+          <div className="settings-body">
+          <section hidden={section !== "appearance"}>
             <h3 className="section-title">外观</h3>
             <div className="field">
               <label>主题</label>
-              <select
-                value={form.theme}
-                onChange={(e) => set("theme", e.target.value as ThemeMode)}
-              >
-                <option value="system">跟随系统</option>
-                <option value="dark">深色</option>
-                <option value="light">浅色</option>
-              </select>
+              <div className="theme-options" role="radiogroup" aria-label="主题">
+                {([['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']] as [ThemeMode, string][]).map(([id, label]) => <label key={id} className={`theme-option ${form.theme === id ? "is-selected" : ""}`}>
+                  <input type="radio" name="theme" value={id} checked={form.theme === id} onChange={() => set("theme", id)} />
+                  <span className={`theme-preview preview-${id}`}><i /><span><b /><b /><b /></span></span>
+                  <span className="theme-option-label">{label}{form.theme === id && <Icon name="check" size={15} />}</span>
+                </label>)}
+              </div>
               <div className="hint">选择跟随系统后，将随系统外观自动切换深浅色。</div>
             </div>
           </section>
-          <section>
+          <section hidden={section !== "downloads"}>
             <h3 className="section-title">下载</h3>
 
             <div className="field">
-              <label>默认下载目录</label>
+              <label htmlFor="preference-field-1">默认下载目录</label>
               <div style={{ display: "flex", gap: 8 }}>
-                <input
+                <input id="preference-field-1"
                   type="text"
                   value={form.download_dir}
                   onChange={(e) => set("download_dir", e.target.value)}
@@ -161,8 +167,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
 
             <div className="field-row">
               <div className="field">
-                <label>默认连接数（1-32）</label>
-                <input
+                <label htmlFor="preference-field-2">默认连接数（1-32）</label>
+                <input id="preference-field-2"
                   type="number"
                   min={1}
                   max={32}
@@ -171,8 +177,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
                 />
               </div>
               <div className="field">
-                <label>最大并发任务数</label>
-                <input
+                <label htmlFor="preference-field-3">最大并发任务数</label>
+                <input id="preference-field-3"
                   type="number"
                   min={1}
                   max={16}
@@ -184,8 +190,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
 
             <div className="field-row">
               <div className="field">
-                <label>全局限速 KB/s（0 = 不限）</label>
-                <input
+                <label htmlFor="preference-field-4">全局限速 KB/s（0 = 不限）</label>
+                <input id="preference-field-4"
                   type="number"
                   min={0}
                   value={form.speed_limit / 1024}
@@ -195,8 +201,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
                 />
               </div>
               <div className="field">
-                <label>分段阈值 MB</label>
-                <input
+                <label htmlFor="preference-field-5">分段阈值 MB</label>
+                <input id="preference-field-5"
                   type="number"
                   min={0}
                   value={form.segment_threshold / 1024 / 1024}
@@ -223,8 +229,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             </div>
 
             <div className="field">
-              <label>文件已存在时</label>
-              <select
+              <label htmlFor="preference-field-6">文件已存在时</label>
+              <select id="preference-field-6"
                 value={form.file_exists}
                 onChange={(e) => set("file_exists", e.target.value as FileExistsAction)}
               >
@@ -242,8 +248,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
               <label htmlFor="confirm_remove_task" style={{ margin: 0 }}>删除任务时询问是否删除本地文件</label>
             </div>
             <div className="field">
-              <label>删除任务时的文件处理方式</label>
-              <select value={form.remove_task_files ? "delete" : "keep"}
+              <label htmlFor="preference-field-7">删除任务时的文件处理方式</label>
+              <select id="preference-field-7" value={form.remove_task_files ? "delete" : "keep"}
                 onChange={(event) => set("remove_task_files", event.target.value === "delete")}>
                 <option value="keep">保留本地文件</option>
                 <option value="delete">同时删除本地文件（移到{trashName}）</option>
@@ -253,12 +259,12 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             <div className="hint">当前全局限速：{form.speed_limit > 0 ? formatBytes(form.speed_limit) + "/s" : "不限速"}</div>
           </section>
 
-          <section>
+          <section hidden={section !== "network"}>
             <h3 className="section-title">网络</h3>
 
             <div className="field">
-              <label>代理</label>
-              <select
+              <label htmlFor="preference-field-8">代理</label>
+              <select id="preference-field-8"
                 value={form.proxy_mode}
                 onChange={(e) => set("proxy_mode", e.target.value as ProxyMode)}
               >
@@ -272,8 +278,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
 
             {form.proxy_mode === "custom" && (
               <div className="field">
-                <label>代理地址</label>
-                <input
+                <label htmlFor="preference-field-9">代理地址</label>
+                <input id="preference-field-9"
                   type="text"
                   value={form.proxy_addr}
                   placeholder="http://127.0.0.1:8080"
@@ -283,8 +289,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             )}
 
             <div className="field">
-              <label>默认 User-Agent</label>
-              <input
+              <label htmlFor="preference-field-10">默认 User-Agent</label>
+              <input id="preference-field-10"
                 type="text"
                 value={form.user_agent}
                 placeholder="留空使用内置 UA"
@@ -300,8 +306,13 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             </div>
           </section>
 
-          <section>
-            <h3 className="section-title">系统</h3>
+          <section hidden={section !== "system"}>
+            <h3 className="section-title">启动与通知</h3>
+            <div className="startup-card">
+              <div className="preference-row"><span className="preference-icon"><Icon name="power" /></span><label htmlFor="autostart"><strong>开机自动启动</strong><span>登录电脑后自动运行 TDM Downloader</span></label><input className="switch-input" type="checkbox" role="switch" id="autostart" checked={form.autostart} disabled={!startupReady || saving} onChange={(event) => set("autostart", event.target.checked)} /></div>
+              <div className="preference-row startup-secondary"><label htmlFor="startup-hidden"><strong>启动时在后台运行</strong><span>{isWindows ? "仅显示托盘图标，需要时再打开主窗口" : "仅显示菜单栏图标，保持桌面整洁"}</span></label><input className="switch-input" type="checkbox" role="switch" id="startup-hidden" checked={form.startup_hidden} disabled={!form.autostart || saving} onChange={(event) => set("startup_hidden", event.target.checked)} /></div>
+              <div className="startup-state"><span className={`connection-dot ${form.autostart ? "is-active" : ""}`} />{!startupReady && !startupError ? "正在读取启动项…" : form.autostart ? "保存后，下次登录将自动启动" : "当前由你手动启动"}</div>
+            </div>
 
             <div className="field">
               <label>下载完成提醒</label>
@@ -315,8 +326,8 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             </div>
 
             <div className="field">
-              <label>全部下载完成后</label>
-              <select
+              <label htmlFor="preference-field-11">全部下载完成后</label>
+              <select id="preference-field-11"
                 value={form.after_finish}
                 onChange={(e) => set("after_finish", e.target.value as AfterFinishAction)}
               >
@@ -340,28 +351,19 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
               </label>
             </div>
 
-            <div className="checkbox-row">
-              <input
-                type="checkbox"
-                id="autostart"
-                checked={autostart}
-                onChange={(e) => setAutostart(e.target.checked)}
-              />
-              <label htmlFor="autostart" style={{ margin: 0 }}>
-                开机自动启动
-              </label>
-            </div>
-          </section>
 
+          </section>
+          </div>
         </div>
 
+        {startupError && <div className="error-text" role="alert">{startupError}<button className="text-button" onClick={loadStartup}>重试</button></div>}
         {saveError && <p className="error-text" role="alert">{saveError}</p>}
-        <div className="modal-footer">
+        <div className="modal-footer"><span className="settings-save-hint">更改将在保存后生效</span>
           <button className="btn" onClick={onClose} disabled={saving}>
             取消
           </button>
-          <button className="btn btn-primary" onClick={save} disabled={saving}>
-            保存
+          <button className="btn btn-primary" onClick={save} disabled={saving || !startupReady}>
+            {saving ? "正在保存…" : "保存设置"}
           </button>
         </div>
       </div>

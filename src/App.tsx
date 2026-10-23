@@ -5,11 +5,21 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { TaskCard } from "./components/TaskCard";
 import { RemoveTaskDialog } from "./components/RemoveTaskDialog";
 import { Tooltip } from "./components/Tooltip";
+import { Icon } from "./components/Icon";
+import type { IconName } from "./components/Icon";
 import type { AppInfo, DownloadTask, NewTaskRequest, Settings } from "./types";
 import { DEFAULT_SETTINGS, formatBytes, formatSpeed } from "./types";
 import { useTheme } from "./useTheme";
 
-type Filter = "all" | "active" | "completed";
+type Filter = "all" | "active" | "paused" | "completed" | "failed";
+const FILTERS: { id: Filter; label: string; icon: IconName }[] = [
+  { id: "all", label: "全部任务", icon: "grid" },
+  { id: "active", label: "进行中", icon: "download" },
+  { id: "paused", label: "已暂停", icon: "pause" },
+  { id: "completed", label: "已完成", icon: "check" },
+  { id: "failed", label: "下载失败", icon: "alert" },
+];
+const running = (task: DownloadTask) => ["pending", "connecting", "downloading", "merging"].includes(task.status);
 
 export default function App() {
   const [tasks, setTasks] = useState<DownloadTask[]>([]);
@@ -247,132 +257,73 @@ export default function App() {
   const filtered = useMemo(() => {
     let list = tasks;
     if (filter === "active")
-      list = list.filter((t) => t.status !== "completed" && t.status !== "cancelled");
-    else if (filter === "completed") list = list.filter((t) => t.status === "completed");
+      list = list.filter(running);
+    else if (filter !== "all") list = list.filter((t) => t.status === filter);
 
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((t) => t.filename.toLowerCase().includes(q) || t.url.toLowerCase().includes(q));
     return list;
   }, [tasks, filter, query]);
 
+  const counts: Record<Filter, number> = {
+    all: tasks.length,
+    active: tasks.filter(running).length,
+    paused: tasks.filter((task) => task.status === "paused").length,
+    completed: stats.doneCount,
+    failed: tasks.filter((task) => task.status === "failed").length,
+  };
+  const currentLabel = FILTERS.find((item) => item.id === filter)!.label;
+
   return (
     <div className="app">
-      <div className="header">
-        <h1>
-          <span className="logo">⬇</span>
-          TDM Downloader
-        </h1>
-
-        <div className="tabs">
-          {(["all", "active", "completed"] as Filter[]).map((f) => (
-            <button
-              key={f}
-              className={`tab ${filter === f ? "active" : ""}`}
-              onClick={() => setFilter(f)}
-            >
-              {f === "all" ? "全部" : f === "active" ? "进行中" : "已完成"}
-            </button>
-          ))}
+      <aside className="sidebar" aria-label="主导航">
+        <div className="brand"><span className="brand-mark"><Icon name="download" size={24} /></span><div><strong>TDM</strong><span>Downloader</span></div></div>
+        <div className="sidebar-caption">下载空间</div>
+        <nav className="sidebar-nav" aria-label="任务分类">
+          {FILTERS.map((item) => <button key={item.id} className={`nav-item ${filter === item.id ? "is-active" : ""}`} aria-current={filter === item.id ? "page" : undefined} onClick={() => { setFilter(item.id); setQuery(""); }}>
+            <Icon name={item.icon} size={19} /><span>{item.label}</span><b>{counts[item.id]}</b>
+          </button>)}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="sidebar-tip"><Icon name="link" size={18} /><p>复制下载链接<span>菜单栏会为你发现新的下载</span></p></div>
+          <button className="nav-item settings-nav-entry" aria-label="设置" onClick={() => setShowSettings(true)}><Icon name="settings" size={24} /><span>设置</span><Icon name="chevron" size={15} /></button>
+          <div className="sidebar-version">TDM Downloader <span>{appInfo ? `v${appInfo.version}` : ""}</span></div>
         </div>
-
-        <input
-          className="search"
-          value={query}
-          placeholder="搜索文件名或链接"
-          onChange={(e) => setQuery(e.target.value)}
-        />
-
-        <Tooltip text="暂停所有进行中的任务">
-          <button
-            className="btn"
-            onClick={pauseAll}
-            disabled={stats.activeCount === 0}
-          >
-            ⏸ 全部暂停
-          </button>
-        </Tooltip>
-        <Tooltip text="继续所有已暂停或失败的任务">
-          <button
-            className="btn"
-            onClick={resumeAll}
-            disabled={stats.pausedCount === 0}
-          >
-            ▶ 全部继续
-          </button>
-        </Tooltip>
-        <Tooltip text="新建下载任务，可一次粘贴多个链接">
-          <button className="btn btn-primary" onClick={() => { void openNewDownload(); }}>
-            + 新建下载
-          </button>
-        </Tooltip>
-        <Tooltip text="设置">
-          <button className="btn settings-entry" aria-label="设置" onClick={() => setShowSettings(true)}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m9.5 3-.6 2.4-1.3.8-2.4-.7-2.5 4.3 1.8 1.7v1.5l-1.8 1.7 2.5 4.3 2.4-.7 1.3.8.6 2.4h5l.6-2.4 1.3-.8 2.4.7 2.5-4.3-1.8-1.7v-1.5l1.8-1.7-2.5-4.3-2.4.7-1.3-.8L14.5 3Z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </button>
-        </Tooltip>
-      </div>
-
-      <div className="content">
-        {filtered.length === 0 ? (
-          <div className="empty">
-            <div className="empty-icon">⬇</div>
-            <div>{query ? "没有匹配的任务" : "还没有下载任务"}</div>
-            <div style={{ marginTop: 8, fontSize: 12 }}>
-              点击右上角「新建下载」开始，可一次粘贴多个链接；复制链接后也会自动识别
+      </aside>
+      <main className="workspace">
+        <header className="workspace-header">
+          <div><div className="eyebrow">你的文件，有序抵达</div><h1>{currentLabel}<span>{counts[filter]}</span></h1></div>
+          <button className="btn btn-primary new-download-button" onClick={() => { void openNewDownload(); }}><Icon name="plus" size={19} />新建下载</button>
+        </header>
+        <section className="overview" aria-label="下载概览">
+          <div className="overview-card"><span className="overview-icon"><Icon name="activity" /></span><div><span>当前速度</span><strong>{formatSpeed(stats.totalSpeed)}</strong></div><small>实时传输</small></div>
+          <div className="overview-card"><span className="overview-icon"><Icon name="download" /></span><div><span>进行中</span><strong>{counts.active}<em>个任务</em></strong></div><small>最多 {settings.max_concurrent} 个并发</small></div>
+          <div className="overview-card"><span className="overview-icon success"><Icon name="check" /></span><div><span>已完成</span><strong>{stats.doneCount}<em>个文件</em></strong></div><small>{formatBytes(stats.doneBytes)} 已下载</small></div>
+        </section>
+        <div className="task-toolbar">
+          <div className="search-wrap"><Icon name="search" size={17} /><input className="search" aria-label="搜索任务" value={query} placeholder="搜索文件名或下载链接" onChange={(event) => setQuery(event.target.value)} />{query && <button className="plain-icon" aria-label="清空搜索" onClick={() => setQuery("")}><Icon name="close" size={16} /></button>}</div>
+          <div className="toolbar-actions">
+            <Tooltip text="暂停所有进行中的任务"><button className="btn btn-quiet" onClick={pauseAll} disabled={stats.activeCount === 0}><Icon name="pause" size={16} /><span>全部暂停</span></button></Tooltip>
+            <Tooltip text="继续所有已暂停或失败的任务"><button className="btn btn-quiet" onClick={resumeAll} disabled={stats.pausedCount === 0}><Icon name="play" size={16} /><span>全部继续</span></button></Tooltip>
+          </div>
+        </div>
+        <div className="content">
+          {filtered.length === 0 ? (
+            <div className="empty">
+              <div className="empty-illustration"><div className="empty-orbit" /><div className="empty-file"><Icon name={query ? "search" : "download"} size={36} /></div><span className="empty-mini"><Icon name="plus" size={16} /></span></div>
+              <h2>{query ? "没有找到匹配的任务" : filter === "all" ? "准备好，下一个文件" : `暂无${currentLabel}任务`}</h2>
+              <p>{query ? "试试其他文件名，或粘贴链接新建下载。" : filter === "all" ? "粘贴一个链接，开始下载。也支持一次添加多个文件。" : "任务状态发生变化后，会显示在这里。"}</p>
+              <button className="btn" onClick={() => query ? setQuery("") : void openNewDownload()}><Icon name={query ? "close" : "plus"} size={17} />{query ? "清空搜索" : "添加下载链接"}</button>
+              {!query && filter === "all" && <span className="empty-hint"><Icon name="link" size={14} />复制链接也能从菜单栏快速添加</span>}
             </div>
-          </div>
-        ) : (
-          <div className="task-list">
-            {filtered.map((t) => (
-              <TaskCard
-                key={t.id}
-                task={t}
-                speed={speeds[t.id] ?? 0}
-                onPause={pause}
-                onResume={resume}
-                onCancel={cancel}
-                onRemove={remove}
-                onOpen={openFile}
-                onOpenDir={openDir}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="footer">
-        <span>
-          进行中 <b>{stats.activeCount}</b>
-        </span>
-        <span>
-          总速度 <b>{formatSpeed(stats.totalSpeed)}</b>
-        </span>
-        <span>
-          已完成 <b>{stats.doneCount}</b> 个 · <b>{formatBytes(stats.doneBytes)}</b>
-        </span>
-        <span style={{ flex: 1 }} />
-        <span>
-          连接数 {settings.connections} · 并发上限 {settings.max_concurrent}
-          {settings.speed_limit > 0 && ` · 限速 ${formatBytes(settings.speed_limit)}/s`}
-          {settings.proxy_mode === "none" && " · 直连"}
-          {settings.proxy_mode === "custom" && " · 自定义代理"}
-          {appInfo && ` · v${appInfo.version}`}
-        </span>
-        {tasks.some((t) => t.status === "completed") && (
-          <Tooltip text="移除列表中全部已完成的任务">
-            <button
-              className="btn btn-icon"
-              disabled={removing}
-              onClick={() => requestRemove(tasks.filter((task) => task.status === "completed"))}
-            >
-              清空已完成
-            </button>
-          </Tooltip>
-        )}
-      </div>
+          ) : <div className="task-list" aria-label={currentLabel}>
+            {filtered.map((t) => <TaskCard key={t.id} task={t} speed={speeds[t.id] ?? 0} onPause={pause} onResume={resume} onCancel={cancel} onRemove={remove} onOpen={openFile} onOpenDir={openDir} />)}
+          </div>}
+        </div>
+        <footer className="footer"><span className={`connection-dot ${counts.active ? "is-active" : ""}`} /><span>{counts.active ? "下载服务运行中" : "已就绪，等待新的下载"}</span><span className="footer-config">{settings.connections} 连接 · {settings.max_concurrent} 并发{settings.speed_limit > 0 ? ` · 限速 ${formatBytes(settings.speed_limit)}/s` : " · 不限速"}</span>
+          {stats.doneCount > 0 && <button className="footer-clear" disabled={removing} onClick={() => requestRemove(tasks.filter((task) => task.status === "completed"))}><Icon name="trash" size={14} />清空已完成</button>}
+        </footer>
+      </main>
 
       {showNew && (
         <NewDownloadDialog

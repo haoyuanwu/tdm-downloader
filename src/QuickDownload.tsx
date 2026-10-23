@@ -1,3 +1,4 @@
+import { Icon } from "./components/Icon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, EVT_QUICK_OPEN } from "./api";
@@ -90,12 +91,12 @@ export default function QuickDownload() {
   return (
     <main className="quick-panel">
       <div className="quick-heading">
-        <div className="quick-mark">↓</div>
+        <div className="quick-mark"><Icon name="download" size={19} /></div>
         <div>
           <strong>{mode === "clipboard" ? "发现下载链接" : "快速下载"}</strong>
           <span>{mode === "clipboard" ? "是否将此文件加入下载任务？" : "输入链接，立即加入下载任务"}</span>
         </div>
-        <button className="quick-close" aria-label="关闭" onClick={dismiss}>×</button>
+        <button className="quick-close" aria-label="关闭" onClick={dismiss}><Icon name="close" size={18} /></button>
       </div>
       {mode === "clipboard" ? (
         <div className="quick-found">

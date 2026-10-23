@@ -306,6 +306,7 @@ pub struct Settings {
     pub close_to_tray: bool,
     /// 开机自动启动
     pub autostart: bool,
+    pub startup_hidden: bool,
     /// 界面主题
     pub theme: ThemeMode,
 }
@@ -328,6 +329,7 @@ impl Default for Settings {
             after_finish: AfterFinishAction::None,
             close_to_tray: true,
             autostart: false,
+            startup_hidden: true,
             theme: ThemeMode::Dark,
         }
     }

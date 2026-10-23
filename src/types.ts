@@ -79,6 +79,7 @@ export interface Settings {
   after_finish: AfterFinishAction;
   close_to_tray: boolean;
   autostart: boolean;
+  startup_hidden: boolean;
   theme: ThemeMode;
 }
 
@@ -113,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   after_finish: "none",
   close_to_tray: true,
   autostart: false,
+  startup_hidden: true,
   theme: "dark",
 };
 

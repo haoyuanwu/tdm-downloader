@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import type { DownloadTask } from "../types";
-import { formatBytes, formatEta, formatSpeed, STATUS_COLOR, STATUS_LABEL } from "../types";
+import { formatBytes, formatEta, formatSpeed, STATUS_LABEL } from "../types";
 import { Tooltip } from "./Tooltip";
+import { Icon } from "./Icon";
 
 interface Props {
   task: DownloadTask;
@@ -26,7 +27,7 @@ function Sparkline({ data }: { data: number[] }) {
     .map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * (h - 2) - 1).toFixed(1)}`)
     .join(" ");
   return (
-    <svg className="sparkline" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+    <svg aria-hidden="true" className="sparkline" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={1.5} />
     </svg>
   );
@@ -43,7 +44,7 @@ export function TaskCard({
   onOpenDir,
 }: Props) {
   const total = task.total_size || 0;
-  const pct = total > 0 ? Math.min((task.downloaded / total) * 100, 100) : 0;
+  const pct = task.status === "completed" ? 100 : total > 0 ? Math.max(0, Math.min((task.downloaded / total) * 100, 100)) : 0;
   const isActive =
     task.status === "downloading" ||
     task.status === "connecting" ||
@@ -80,19 +81,17 @@ export function TaskCard({
   };
 
   return (
-    <div className="task-card">
+    <article className={`task-card status-${task.status}`}>
       <div className="task-top">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="task-name">{task.filename}</div>
+        <div className="file-type"><Icon name="file" size={24} /><span>{task.filename.split(".").length > 1 ? task.filename.split(".").pop()!.slice(0, 5).toUpperCase() : "FILE"}</span></div>
+        <div className="task-identity">
+          <div className="task-name" title={task.filename}>{task.filename}</div>
           <div className="task-url" title={task.url}>{task.url}</div>
         </div>
 
         {isActive && <Sparkline data={history} />}
 
-        <span
-          className="badge"
-          style={{ background: `${STATUS_COLOR[task.status]}22`, color: STATUS_COLOR[task.status] }}
-        >
+        <span className={`badge badge-${task.status}`}>
           {STATUS_LABEL[task.status]}
         </span>
 
@@ -106,53 +105,53 @@ export function TaskCard({
           {isPausable && (
             <Tooltip text="暂停">
               <button className="btn btn-icon" onClick={() => onPause(task.id)}>
-                ⏸
+                <Icon name="pause" size={17} />
               </button>
             </Tooltip>
           )}
           {isResumable && (
             <Tooltip text={task.status === "failed" ? "重试" : "继续"}>
               <button className="btn btn-icon" onClick={() => onResume(task.id)}>
-                ▶
+                <Icon name="play" size={17} />
               </button>
             </Tooltip>
           )}
           {isActive && (
             <Tooltip text="取消下载">
               <button className="btn btn-icon" onClick={() => onCancel(task.id)}>
-                ✕
+                <Icon name="close" size={17} />
               </button>
             </Tooltip>
           )}
           {isDone && (
             <Tooltip text="打开文件">
               <button className="btn btn-icon" onClick={() => onOpen(task)}>
-                📂
+                <Icon name="external" size={17} />
               </button>
             </Tooltip>
           )}
           {!isActive && (
             <Tooltip text="打开所在目录">
               <button className="btn btn-icon" onClick={() => onOpenDir(task)}>
-                📁
+                <Icon name="folder" size={17} />
               </button>
             </Tooltip>
           )}
           <Tooltip text="复制链接">
             <button className="btn btn-icon" onClick={copyUrl}>
-              🔗
+              <Icon name="link" size={17} />
             </button>
           </Tooltip>
           <Tooltip text={isActive ? "取消并从列表移除" : "从列表移除"}>
             <button className="btn btn-icon btn-danger" onClick={() => onRemove(task.id)}>
-              🗑
+              <Icon name="trash" size={17} />
             </button>
           </Tooltip>
         </div>
       </div>
 
       <div className="progress-wrap">
-        <div className="progress-bar">
+        <div className={`progress-bar ${isActive && total === 0 ? "is-indeterminate" : ""}`} role="progressbar" aria-label={`${task.filename} 下载进度`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={total > 0 || isDone ? pct : undefined} aria-valuetext={total > 0 || isDone ? `${pct.toFixed(1)}%` : "文件大小未知"}>
           <div className={fillClass} style={{ width: `${pct}%` }} />
         </div>
 
@@ -177,7 +176,7 @@ export function TaskCard({
             {total > 0 ? ` / ${formatBytes(total)}` : " / 未知"}
           </span>
           <span>
-            {pct.toFixed(1)}%
+            {total > 0 || isDone ? `${pct.toFixed(1)}%` : "大小未知"}
             {task.connections > 1 && ` · ${task.connections} 连接`}
             {task.speed_limit > 0 && ` · 限速 ${formatBytes(task.speed_limit)}/s`}
           </span>
@@ -185,8 +184,8 @@ export function TaskCard({
           {isActive && <span>剩余 {formatEta(eta ? Math.round(eta) : null)}</span>}
         </div>
 
-        {task.error && <div className="error-text">⚠ {task.error}</div>}
+        {task.error && <div className="error-text" role="alert"><Icon name="alert" size={15} />{task.error}</div>}
       </div>
-    </div>
+    </article>
   );
 }

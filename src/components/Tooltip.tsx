@@ -74,6 +74,9 @@ export function Tooltip({ text, children, placement = "top", delay = 300 }: Tool
         className="tooltip-anchor"
         onMouseEnter={() => show()}
         onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+        onKeyDown={(event) => { if (event.key === "Escape") hide(); }}
         onMouseDown={hide} /* 点击后立即收起，避免气泡挡住后续操作 */
       >
         {trigger}
