@@ -11,6 +11,10 @@ const running = (task: DownloadTask) => ["pending", "connecting", "downloading",
 export default function QuickTaskList() {
   const [tasks, setTasks] = useState<DownloadTask[]>([]);
   const [speeds, setSpeeds] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [operating, setOperating] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [menu, setMenu] = useState<{ task: DownloadTask; x: number; y: number } | null>(null);
@@ -45,6 +49,9 @@ export default function QuickTaskList() {
   };
 
   const action = async (task: DownloadTask, name: string) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setOperating(task.id); setSelected(task.id);
     setMenu(null); setError(""); setNotice("");
     try {
       await api.quickTaskInteraction(true);
@@ -52,14 +59,18 @@ export default function QuickTaskList() {
         const settings = await api.getSettings();
         if (settings.confirm_remove_task) { setDeleteFiles(settings.remove_task_files); setRemove(task); return; }
         await removeTask(task, settings.remove_task_files);
-      } else if (name === "open") await api.openPath(task.save_path);
-      else if (name === "reveal") await api.revealTaskFile(task.id);
+      } else if (name === "open") { await api.openPath(task.save_path); setNotice(`已请求打开：${task.filename}`); }
+      else if (name === "reveal") {
+        await api.revealTaskFile(task.id);
+        setNotice(`已在${isWindows ? "资源管理器" : " Finder "}中定位：${task.filename}`);
+      }
       else {
         const path = await api.saveTaskAs(task.id);
         if (path) setNotice(`已另存为：${path}`);
       }
       await api.quickTaskInteraction(false);
-    } catch (reason) { setError(String(reason)); await api.quickTaskInteraction(false).catch(() => {}); }
+    } catch (reason) { setError(`操作失败：${String(reason)}`); await api.quickTaskInteraction(false).catch(() => {}); }
+    finally { actionLock.current = false; setOperating(null); }
   };
 
   useEffect(() => {
@@ -80,7 +91,8 @@ export default function QuickTaskList() {
       ]);
       const list = await api.listTasks();
       if (active) setTasks(list);
-    })().catch((reason) => { if (active) setError(String(reason)); });
+    })().catch((reason) => { if (active) setError(String(reason)); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; cleanups.forEach((unlisten) => unlisten()); };
   }, []);
 
@@ -101,16 +113,23 @@ export default function QuickTaskList() {
       <div className="quick-task-list" aria-label="下载任务">
         {error && !remove && <p className="quick-error" role="alert">{error}</p>}
         {notice && <p className="hint" role="status">{notice}</p>}
-        {!error && !visible.length && <p className="quick-empty">还没有下载任务</p>}
+        {loading && <p className="quick-empty" role="status">正在读取下载任务…</p>}
+        {!loading && !error && !visible.length && <p className="quick-empty">还没有下载任务</p>}
         {visible.map((task) => {
           const known = task.total_size > 0 && task.total_size < Number.MAX_SAFE_INTEGER;
           const percent = task.status === "completed" ? 100 : known ? Math.min(100, Math.max(0, task.downloaded / task.total_size * 100)) : undefined;
           const speed = task.status === "downloading" ? (speeds[task.id] ? formatSpeed(speeds[task.id]) : "0 B/s") : "—";
           return (
-            <article key={task.id} className={`quick-task quick-task-${task.status}`} tabIndex={0}
-              aria-label={`${task.filename}，右键打开操作菜单`}
-              onContextMenu={(event) => { event.preventDefault(); setMenu({ task, x: Math.max(8, Math.min(event.clientX, window.innerWidth - 196)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 174)) }); }}
-              onKeyDown={(event) => { if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) { event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect(); setMenu({ task, x: Math.min(rect.left + 12, window.innerWidth - 196), y: Math.max(8, Math.min(rect.top + 16, window.innerHeight - 174)) }); } }}>
+            <article key={task.id} className={`quick-task quick-task-${task.status}${selected === task.id ? " is-selected" : ""}${operating === task.id ? " is-working" : ""}`} tabIndex={0} role="button"
+              aria-label={`${task.filename}，${STATUS_LABEL[task.status]}，点击打开所在目录，右键更多操作`}
+              aria-busy={operating === task.id} aria-disabled={operating !== null || busy}
+              title={`${task.save_path}\n点击打开所在目录 · 右键更多操作`}
+              onClick={() => { if (!busy) void action(task, "reveal"); }}
+              onContextMenu={(event) => { event.preventDefault(); if (operating || busy) return; setSelected(task.id); setMenu({ task, x: Math.max(8, Math.min(event.clientX, window.innerWidth - 196)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 174)) }); }}
+              onKeyDown={(event) => {
+                if ((event.key === "Enter" || event.key === " ") && !busy) { event.preventDefault(); void action(task, "reveal"); return; }
+                if (operating || busy) return;
+                if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) { event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect(); setMenu({ task, x: Math.min(rect.left + 12, window.innerWidth - 196), y: Math.max(8, Math.min(rect.top + 16, window.innerHeight - 174)) }); } }}>
               <div className="quick-task-title">
                 <strong title={task.filename}>{task.filename}</strong>
                 <span>{percent === undefined ? "大小未知" : `${percent.toFixed(0)}%`}</span>
@@ -121,9 +140,10 @@ export default function QuickTaskList() {
                 <div style={{ width: `${percent ?? 0}%` }} />
               </div>
               <div className="quick-task-meta">
-                <span title={task.error || undefined}>{STATUS_LABEL[task.status]} · {formatBytes(task.downloaded)}{known ? ` / ${formatBytes(task.total_size)}` : ""}</span>
+                <span title={task.error || undefined}><i className={`quick-status-dot status-${task.status}`} aria-hidden="true" />{STATUS_LABEL[task.status]} · {formatBytes(task.downloaded)}{known ? ` / ${formatBytes(task.total_size)}` : ""}</span>
                 <span>{speed}</span>
               </div>
+              <div className="quick-task-affordance" aria-hidden="true"><Icon name="folder" size={12} /><span>{operating === task.id ? "正在处理…" : "打开所在目录"}</span><Icon name="arrow" size={12} /></div>
             </article>
           );
         })}

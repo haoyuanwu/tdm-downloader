@@ -992,3 +992,20 @@ h1 > span { display: inline-flex; vertical-align: middle; padding: 3px 8px; marg
 .quick-remove-dialog .remove-options label { padding:8px; gap:8px; }
 .quick-remove-dialog .remove-remember { font-size:12px; margin:8px 0; }
 .quick-remove-dialog .modal-footer { margin-top:10px; padding-top:10px; }
+
+.quick-task[role="button"] { position:relative; margin:2px 0; padding:10px; border:1px solid transparent; border-radius:9px; cursor:pointer; transition:background .15s, border-color .15s; }
+.quick-task[role="button"]:first-child { padding-top:10px; }
+.quick-task[role="button"]:hover { background:var(--bg-hover); }
+.quick-task[role="button"]:active { background:var(--accent-soft); }
+.quick-task[role="button"].is-selected { border-color:var(--border); background:var(--bg-hover); }
+.quick-task[role="button"]:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.quick-task[role="button"].is-working { cursor:progress; border-color:var(--accent); }
+.quick-task-affordance { display:flex; align-items:center; gap:5px; margin-top:7px; min-height:14px; color:var(--text-dim); font-size:10px; opacity:0; transition:opacity .15s; }
+.quick-task-affordance > svg:last-child { margin-left:auto; }
+.quick-task:hover .quick-task-affordance, .quick-task:focus-visible .quick-task-affordance, .quick-task.is-selected .quick-task-affordance { opacity:1; }
+.quick-status-dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--text-dim); margin:0 5px 1px 0; }
+.quick-status-dot.status-downloading, .quick-status-dot.status-connecting, .quick-status-dot.status-merging { background:var(--accent); }
+.quick-status-dot.status-completed { background:var(--success); }
+.quick-status-dot.status-failed { background:var(--danger); }
+.quick-status-dot.status-paused { background:var(--warn); }
+@media (prefers-reduced-motion:reduce) { .quick-task[role="button"], .quick-task-affordance { transition:none; } }

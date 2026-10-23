@@ -56,3 +56,7 @@ Windows 使用 `npm run tauri build` 构建安装包；`npm run package` 额外�
 仍需人工实测：安装版通知身份与横幅点击、系统通知设置跳转、实际提示音、多显示器/托盘溢出区交互。关机和睡眠仅检查编译与调用方式，没有实际执行。当前 Windows 环境无法验证 macOS 原生运行行为。
 
 通知激活差异参考 [Microsoft 桌面通知文档](https://learn.microsoft.com/en-us/windows/apps/design/shell/tiles-and-notifications/send-local-toast-desktop-cpp-wrl)；当前组件行为见 `tauri-plugin-notification` 2.7 的 `desktop.rs` 文档。
+
+## 状态栏任务列表交互
+
+任务列表与 macOS 共用组件，点击或按 Enter / 空格定位本地文件，Windows 显示「资源管理器」，macOS 显示「Finder」。列表支持悬停、选中、操作中和结果反馈，右键菜单提供打开、定位、另存为与删除确认。后续此处功能变更需同步考虑两端。Windows 原生对话框与资源管理器操作仍需在 Windows 机器验收。
