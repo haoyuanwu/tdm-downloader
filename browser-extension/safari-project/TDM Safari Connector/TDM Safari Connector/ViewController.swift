@@ -25,9 +25,12 @@ class ViewController: NSViewController, WKNavigationDelegate, WKScriptMessageHan
         SFSafariExtensionManager.getStateOfSafariExtension(withIdentifier: extensionBundleIdentifier) { state, error in
             DispatchQueue.main.async {
                 if let state = state, error == nil {
+                    NSLog("TDM Safari state: recognized, enabled=%@", state.isEnabled ? "yes" : "no")
                     self.webView.evaluateJavaScript("show(\(state.isEnabled), true)")
                     self.report("")
                 } else {
+                    let failure = error as NSError?
+                    NSLog("TDM Safari state: unavailable, domain=%@ code=%ld", failure?.domain ?? "unknown", failure?.code ?? -1)
                     self.webView.evaluateJavaScript("show(null, true)")
                     self.report("Safari 尚未识别此扩展。请先在 Safari → 设置 → 扩展中检查「TDM 下载助手」。临时签名版若未出现在列表中，需要手动在 Safari「开发」菜单中允许未签名的扩展，再点击「重新检查」。")
                 }

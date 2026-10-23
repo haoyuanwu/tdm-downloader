@@ -65,3 +65,9 @@ lipo -archs "/Applications/TDM Downloader.app/Contents/MacOS/tdm-downloader"
 - “关机”在全部任务完成后等待 30 秒，再通过系统事件请求关机。macOS 可能要求授权自动化权限；“休眠”使用 `pmset sleepnow`。
 
 默认生成的 `.app` 使用临时签名，未进行 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。临时签名修复完整应用包的签名一致性，不等同于通过 Apple 的发行信任检查。要通过默认 Gatekeeper 检查，需要 Developer ID Application 证书及公证凭据；可按 [Tauri macOS 签名说明](https://v2.tauri.app/distribute/sign/macos/) 设置 `APPLE_SIGNING_IDENTITY` 与 Apple 公证环境变量后发布。
+
+## Safari 本地测试签名
+
+本地打包自动优先选择 Developer ID Application 或 Apple Development 证书，仅用于 Safari 安装器与扩展。当前 Safari 27 的实测中，临时签名虽然可通过 codesign 完整性校验，Safari 仍会拒绝将其列入扩展设置；换用 Apple Development 签名后可识别。
+
+可通过 `TDM_SAFARI_SIGNING_IDENTITY` 显式指定签名证书 SHA 或名称，设为 `-` 可选择临时签名。公开发行应使用 Developer ID Application 并完成公证；发布脚本不会自动将个人开发证书用于公开包。安装器更新保留较新版本与已签名副本，防止被临时签名资源覆盖。

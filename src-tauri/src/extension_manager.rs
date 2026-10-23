@@ -18,7 +18,7 @@ fn read_version(path: &Path) -> Option<String> {
         .get("version")?.as_str().map(str::to_owned)
 }
 
-fn needs_update(installed: Option<&str>, available: &str) -> bool {
+pub(crate) fn needs_update(installed: Option<&str>, available: &str) -> bool {
     let Some(installed) = installed else { return true; };
     let parse = |version: &str| version.split('.').map(str::parse::<u32>).collect::<Result<Vec<_>, _>>();
     match (parse(installed), parse(available)) {

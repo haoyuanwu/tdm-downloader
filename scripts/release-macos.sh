@@ -71,7 +71,7 @@ prepare_build() {
   if [[ "$build_prepared" == false ]]; then
     echo "构建共享的前端与 Safari 扩展（仅执行一次）……"
     npm run build
-    bash scripts/build-browser-extensions.sh
+    TDM_SAFARI_SIGNING_IDENTITY="${TDM_SAFARI_SIGNING_IDENTITY:--}" bash scripts/build-browser-extensions.sh
     build_prepared=true
   fi
 }

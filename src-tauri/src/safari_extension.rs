@@ -15,6 +15,14 @@ fn bundle_value(path: &std::path::Path, key: &str) -> Option<String> {
 }
 
 #[cfg(target_os = "macos")]
+fn signing_team(path: &std::path::Path) -> Option<String> {
+    let output = std::process::Command::new("/usr/bin/codesign").arg("-dvv").arg(path).output().ok()?;
+    String::from_utf8_lossy(&output.stderr).lines()
+        .find_map(|line| line.strip_prefix("TeamIdentifier="))
+        .filter(|team| *team != "not set").map(str::to_owned)
+}
+
+#[cfg(target_os = "macos")]
 fn register_single_copy(connector: &std::path::Path) -> Result<(), String> {
     let extension = connector.join("Contents/PlugIns/TDM Safari Connector Extension.appex");
     let listing = std::process::Command::new("/usr/bin/pluginkit")
@@ -53,7 +61,13 @@ fn install_connector(source: &std::path::Path) -> Result<std::path::PathBuf, Str
     if destination.exists() && bundle_value(&destination, "CFBundleIdentifier").as_deref() != Some("com.tdm.downloader.safari") {
         return Err("用户 Applications 目录存在同名的其他应用，请先移动该应用后重试。".into());
     }
-    if bundle_value(&destination, "CFBundleShortVersionString").as_deref() != Some(version.as_str()) {
+    let source_team = signing_team(source);
+    let installed_team = signing_team(&destination);
+    let signed_downgrade = source_team.is_none() && installed_team.is_some();
+    let needs_update = crate::extension_manager::needs_update(
+        bundle_value(&destination, "CFBundleShortVersionString").as_deref(), &version);
+    let signature_upgrade = source_team.is_some() && source_team != installed_team;
+    if !signed_downgrade && (needs_update || signature_upgrade) {
         let parent = destination.parent().ok_or("无效的应用目录")?;
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         let stage = parent.join(".TDM Safari Connector.installing.app");
@@ -70,6 +84,9 @@ fn install_connector(source: &std::path::Path) -> Result<std::path::PathBuf, Str
             return Err(error.to_string());
         }
         if backup.exists() { let _ = std::fs::remove_dir_all(backup); }
+        // A signing identity change also changes Safari's extension identity.
+        let _ = std::process::Command::new("/usr/bin/pluginkit").arg("-r")
+            .arg(destination.join("Contents/PlugIns/TDM Safari Connector Extension.appex")).output();
     }
     register_single_copy(&destination)?;
     Ok(destination)
