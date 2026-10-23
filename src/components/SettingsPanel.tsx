@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { BrowserExtensionGuide } from "./BrowserExtensionGuide";
 import { Icon } from "./Icon";
 import type { IconName } from "./Icon";
 import { useDialog } from "../useDialog";
@@ -130,9 +131,11 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
             {([
               ["appearance", "外观", "monitor"], ["downloads", "下载", "download"],
               ["network", "网络", "globe"], ["system", "启动与通知", "power"],
+              ["browser", "浏览器扩展", "link"],
             ] as [string, string, IconName][]).map(([id, label, icon]) => <button key={id} className={section === id ? "is-active" : ""} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}><Icon name={icon} size={18} />{label}</button>)}
           </nav>
           <div className="settings-body">
+          <div hidden={section !== "browser"}><BrowserExtensionGuide /></div>
           <section hidden={section !== "appearance"}>
             <h3 className="section-title">外观</h3>
             <div className="field">
@@ -358,13 +361,13 @@ export function SettingsPanel({ settings, onClose, onSaved }: Props) {
 
         {startupError && <div className="error-text" role="alert">{startupError}<button className="text-button" onClick={loadStartup}>重试</button></div>}
         {saveError && <p className="error-text" role="alert">{saveError}</p>}
-        <div className="modal-footer"><span className="settings-save-hint">更改将在保存后生效</span>
+        <div className="modal-footer"><span className="settings-save-hint">{section === "browser" ? "请按对应浏览器的教程完成安装" : "更改将在保存后生效"}</span>
           <button className="btn" onClick={onClose} disabled={saving}>
-            取消
+            {section === "browser" ? "关闭" : "取消"}
           </button>
-          <button className="btn btn-primary" onClick={save} disabled={saving || !startupReady}>
+          {section !== "browser" && <button className="btn btn-primary" onClick={save} disabled={saving || !startupReady}>
             {saving ? "正在保存…" : "保存设置"}
-          </button>
+          </button>}
         </div>
       </div>
     </div>

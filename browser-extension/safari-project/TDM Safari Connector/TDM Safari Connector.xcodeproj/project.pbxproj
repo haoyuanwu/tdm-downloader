@@ -1,0 +1,597 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 110;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		96899D80308B3F7700DBEF7B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96899D7F308B3F7700DBEF7B /* AppDelegate.swift */; };
+		96899D84308B3F7700DBEF7B /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 96899D82308B3F7700DBEF7B /* Main.html */; };
+		96899D86308B3F7700DBEF7B /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 96899D85308B3F7700DBEF7B /* Icon.png */; };
+		96899D88308B3F7700DBEF7B /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 96899D87308B3F7700DBEF7B /* Style.css */; };
+		96899D8A308B3F7700DBEF7B /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 96899D89308B3F7700DBEF7B /* Script.js */; };
+		96899D8C308B3F7700DBEF7B /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96899D8B308B3F7700DBEF7B /* ViewController.swift */; };
+		96899D8F308B3F7700DBEF7B /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 96899D8D308B3F7700DBEF7B /* Main.storyboard */; };
+		96899D91308B3F7800DBEF7B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 96899D90308B3F7800DBEF7B /* Assets.xcassets */; };
+		96899D98308B3F7800DBEF7B /* TDM Safari Connector Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 96899D97308B3F7800DBEF7B /* TDM Safari Connector Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		96899D9D308B3F7800DBEF7B /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96899D9C308B3F7800DBEF7B /* SafariWebExtensionHandler.swift */; };
+		96899DAF308B3F7800DBEF7B /* popup.js in Resources */ = {isa = PBXBuildFile; fileRef = 96899DA9308B3F7800DBEF7B /* popup.js */; };
+		96899DB0308B3F7800DBEF7B /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 96899DAA308B3F7800DBEF7B /* background.js */; };
+		96899DB1308B3F7800DBEF7B /* popup.html in Resources */ = {isa = PBXBuildFile; fileRef = 96899DAB308B3F7800DBEF7B /* popup.html */; };
+		96899DB2308B3F7800DBEF7B /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 96899DAC308B3F7800DBEF7B /* manifest.json */; };
+		96899DB3308B3F7800DBEF7B /* popup.css in Resources */ = {isa = PBXBuildFile; fileRef = 96899DAD308B3F7800DBEF7B /* popup.css */; };
+		96899DB4308B3F7800DBEF7B /* content.js in Resources */ = {isa = PBXBuildFile; fileRef = 96899DAE308B3F7800DBEF7B /* content.js */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		96899D99308B3F7800DBEF7B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 96899D74308B3F7700DBEF7B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 96899D96308B3F7800DBEF7B;
+			remoteInfo = "TDM Safari Connector Extension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		96899DA4308B3F7800DBEF7B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				96899D98308B3F7800DBEF7B /* TDM Safari Connector Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		96899D7C308B3F7700DBEF7B /* TDM Safari Connector.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TDM Safari Connector.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		96899D7F308B3F7700DBEF7B /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		96899D83308B3F7700DBEF7B /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
+		96899D85308B3F7700DBEF7B /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		96899D87308B3F7700DBEF7B /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
+		96899D89308B3F7700DBEF7B /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
+		96899D8B308B3F7700DBEF7B /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		96899D8E308B3F7700DBEF7B /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		96899D90308B3F7800DBEF7B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		96899D92308B3F7800DBEF7B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		96899D97308B3F7800DBEF7B /* TDM Safari Connector Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "TDM Safari Connector Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		96899D9C308B3F7800DBEF7B /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		96899D9E308B3F7800DBEF7B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		96899DA9308B3F7800DBEF7B /* popup.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = popup.js; path = ../../../safari/popup.js; sourceTree = "<group>"; };
+		96899DAA308B3F7800DBEF7B /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = background.js; path = ../../../safari/background.js; sourceTree = "<group>"; };
+		96899DAB308B3F7800DBEF7B /* popup.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = popup.html; path = ../../../safari/popup.html; sourceTree = "<group>"; };
+		96899DAC308B3F7800DBEF7B /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../../safari/manifest.json; sourceTree = "<group>"; };
+		96899DAD308B3F7800DBEF7B /* popup.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = popup.css; path = ../../../safari/popup.css; sourceTree = "<group>"; };
+		96899DAE308B3F7800DBEF7B /* content.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = content.js; path = ../../../safari/content.js; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		96899D79308B3F7700DBEF7B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		96899D94308B3F7800DBEF7B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		96899D73308B3F7700DBEF7B = {
+			isa = PBXGroup;
+			children = (
+				96899D7E308B3F7700DBEF7B /* TDM Safari Connector */,
+				96899D9B308B3F7800DBEF7B /* TDM Safari Connector Extension */,
+				96899D7D308B3F7700DBEF7B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		96899D7D308B3F7700DBEF7B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				96899D7C308B3F7700DBEF7B /* TDM Safari Connector.app */,
+				96899D97308B3F7800DBEF7B /* TDM Safari Connector Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		96899D7E308B3F7700DBEF7B /* TDM Safari Connector */ = {
+			isa = PBXGroup;
+			children = (
+				96899D7F308B3F7700DBEF7B /* AppDelegate.swift */,
+				96899D8B308B3F7700DBEF7B /* ViewController.swift */,
+				96899D8D308B3F7700DBEF7B /* Main.storyboard */,
+				96899D90308B3F7800DBEF7B /* Assets.xcassets */,
+				96899D92308B3F7800DBEF7B /* Info.plist */,
+				96899D81308B3F7700DBEF7B /* Resources */,
+			);
+			path = "TDM Safari Connector";
+			sourceTree = "<group>";
+		};
+		96899D81308B3F7700DBEF7B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				96899D82308B3F7700DBEF7B /* Main.html */,
+				96899D85308B3F7700DBEF7B /* Icon.png */,
+				96899D87308B3F7700DBEF7B /* Style.css */,
+				96899D89308B3F7700DBEF7B /* Script.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		96899D9B308B3F7800DBEF7B /* TDM Safari Connector Extension */ = {
+			isa = PBXGroup;
+			children = (
+				96899DA8308B3F7800DBEF7B /* Resources */,
+				96899D9C308B3F7800DBEF7B /* SafariWebExtensionHandler.swift */,
+				96899D9E308B3F7800DBEF7B /* Info.plist */,
+			);
+			path = "TDM Safari Connector Extension";
+			sourceTree = "<group>";
+		};
+		96899DA8308B3F7800DBEF7B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				96899DA9308B3F7800DBEF7B /* popup.js */,
+				96899DAA308B3F7800DBEF7B /* background.js */,
+				96899DAB308B3F7800DBEF7B /* popup.html */,
+				96899DAC308B3F7800DBEF7B /* manifest.json */,
+				96899DAD308B3F7800DBEF7B /* popup.css */,
+				96899DAE308B3F7800DBEF7B /* content.js */,
+			);
+			name = Resources;
+			path = "TDM Safari Connector Extension";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		96899D7B308B3F7700DBEF7B /* TDM Safari Connector */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 96899DA5308B3F7800DBEF7B /* Build configuration list for PBXNativeTarget "TDM Safari Connector" */;
+			buildPhases = (
+				96899D78308B3F7700DBEF7B /* Sources */,
+				96899D79308B3F7700DBEF7B /* Frameworks */,
+				96899D7A308B3F7700DBEF7B /* Resources */,
+				96899DA4308B3F7800DBEF7B /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				96899D9A308B3F7800DBEF7B /* PBXTargetDependency */,
+			);
+			name = "TDM Safari Connector";
+			productName = "TDM Safari Connector";
+			productReference = 96899D7C308B3F7700DBEF7B /* TDM Safari Connector.app */;
+			productType = "com.apple.product-type.application";
+		};
+		96899D96308B3F7800DBEF7B /* TDM Safari Connector Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 96899DA1308B3F7800DBEF7B /* Build configuration list for PBXNativeTarget "TDM Safari Connector Extension" */;
+			buildPhases = (
+				96899D93308B3F7800DBEF7B /* Sources */,
+				96899D94308B3F7800DBEF7B /* Frameworks */,
+				96899D95308B3F7800DBEF7B /* Resources */,
+			);
+			buildRules = (
+			);
+			name = "TDM Safari Connector Extension";
+			productName = "TDM Safari Connector Extension";
+			productReference = 96899D97308B3F7800DBEF7B /* TDM Safari Connector Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		96899D74308B3F7700DBEF7B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2710;
+				LastUpgradeCheck = 2710;
+				TargetAttributes = {
+					96899D7B308B3F7700DBEF7B = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					96899D96308B3F7800DBEF7B = {
+						CreatedOnToolsVersion = 27.1;
+					};
+				};
+			};
+			buildConfigurationList = 96899D77308B3F7700DBEF7B /* Build configuration list for PBXProject "TDM Safari Connector" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 96899D73308B3F7700DBEF7B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 96899D7D308B3F7700DBEF7B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				96899D7B308B3F7700DBEF7B /* TDM Safari Connector */,
+				96899D96308B3F7800DBEF7B /* TDM Safari Connector Extension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		96899D7A308B3F7700DBEF7B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				96899D86308B3F7700DBEF7B /* Icon.png in Resources */,
+				96899D8F308B3F7700DBEF7B /* Main.storyboard in Resources */,
+				96899D8A308B3F7700DBEF7B /* Script.js in Resources */,
+				96899D84308B3F7700DBEF7B /* Main.html in Resources */,
+				96899D91308B3F7800DBEF7B /* Assets.xcassets in Resources */,
+				96899D88308B3F7700DBEF7B /* Style.css in Resources */,
+			);
+		};
+		96899D95308B3F7800DBEF7B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				96899DB4308B3F7800DBEF7B /* content.js in Resources */,
+				96899DB3308B3F7800DBEF7B /* popup.css in Resources */,
+				96899DB2308B3F7800DBEF7B /* manifest.json in Resources */,
+				96899DB0308B3F7800DBEF7B /* background.js in Resources */,
+				96899DB1308B3F7800DBEF7B /* popup.html in Resources */,
+				96899DAF308B3F7800DBEF7B /* popup.js in Resources */,
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		96899D78308B3F7700DBEF7B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				96899D8C308B3F7700DBEF7B /* ViewController.swift in Sources */,
+				96899D80308B3F7700DBEF7B /* AppDelegate.swift in Sources */,
+			);
+		};
+		96899D93308B3F7800DBEF7B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				96899D9D308B3F7800DBEF7B /* SafariWebExtensionHandler.swift in Sources */,
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		96899D9A308B3F7800DBEF7B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 96899D96308B3F7800DBEF7B /* TDM Safari Connector Extension */;
+			targetProxy = 96899D99308B3F7800DBEF7B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		96899D82308B3F7700DBEF7B /* Main.html */ = {
+			isa = PBXVariantGroup;
+			children = (
+				96899D83308B3F7700DBEF7B /* Base */,
+			);
+			name = Main.html;
+			sourceTree = "<group>";
+		};
+		96899D8D308B3F7700DBEF7B /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				96899D8E308B3F7700DBEF7B /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		96899D9F308B3F7800DBEF7B /* Debug configuration for PBXProject "TDM Safari Connector" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		96899DA0308B3F7800DBEF7B /* Release configuration for PBXProject "TDM Safari Connector" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		96899DA2308B3F7800DBEF7B /* Debug configuration for PBXNativeTarget "TDM Safari Connector Extension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TDM Safari Connector Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TDM Safari Connector Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 0.1.1;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.tdm.downloader.safari.Extension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		96899DA3308B3F7800DBEF7B /* Release configuration for PBXNativeTarget "TDM Safari Connector Extension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TDM Safari Connector Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TDM Safari Connector Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 0.1.1;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.tdm.downloader.safari.Extension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		96899DA6308B3F7800DBEF7B /* Debug configuration for PBXNativeTarget "TDM Safari Connector" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TDM Safari Connector/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TDM Safari Connector";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_NSViewGestureRecognizerIsExclusive = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.1;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tdm.downloader.safari";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		96899DA7308B3F7800DBEF7B /* Release configuration for PBXNativeTarget "TDM Safari Connector" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 2;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TDM Safari Connector/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "TDM Safari Connector";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_NSViewGestureRecognizerIsExclusive = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.1;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tdm.downloader.safari";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		96899D77308B3F7700DBEF7B /* Build configuration list for PBXProject "TDM Safari Connector" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				96899D9F308B3F7800DBEF7B /* Debug configuration for PBXProject "TDM Safari Connector" */,
+				96899DA0308B3F7800DBEF7B /* Release configuration for PBXProject "TDM Safari Connector" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		96899DA1308B3F7800DBEF7B /* Build configuration list for PBXNativeTarget "TDM Safari Connector Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				96899DA2308B3F7800DBEF7B /* Debug configuration for PBXNativeTarget "TDM Safari Connector Extension" */,
+				96899DA3308B3F7800DBEF7B /* Release configuration for PBXNativeTarget "TDM Safari Connector Extension" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		96899DA5308B3F7800DBEF7B /* Build configuration list for PBXNativeTarget "TDM Safari Connector" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				96899DA6308B3F7800DBEF7B /* Debug configuration for PBXNativeTarget "TDM Safari Connector" */,
+				96899DA7308B3F7800DBEF7B /* Release configuration for PBXNativeTarget "TDM Safari Connector" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 96899D74308B3F7700DBEF7B /* Project object */;
+	validationLevel = 1;
+}

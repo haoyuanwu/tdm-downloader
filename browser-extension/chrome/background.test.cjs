@@ -1,0 +1,7 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');
+async function run(status, options={}) {const calls=[];let listener;const event={addListener(){}};const chrome={storage:{local:{get:async()=>({enabled:!options.disabled}),set:async()=>{}}},runtime:{onInstalled:event,sendNativeMessage:async()=>{if(options.fail)throw Error('host missing');return {status};}},contextMenus:{onClicked:event},downloads:{onCreated:{addListener(fn){listener=fn;}},pause:async()=>{calls.push('pause');},resume:async()=>{calls.push('resume');},cancel:async()=>{calls.push('cancel');}}};vm.runInNewContext(fs.readFileSync(__dirname+'/background.js','utf8'),{chrome,URL,Set});await listener({id:1,url:options.url||'https://example.com/file.zip',filename:'file.zip',state:'in_progress'});return calls;}
+test('only cancel browser download after TDM has created its task',async()=>assert.deepEqual(await run('accepted'),['pause','cancel']));
+for(const status of ['cancelled','timeout','error'])test(status+' resumes original download',async()=>assert.deepEqual(await run(status),['pause','resume']));
+test('native host failure resumes original',async()=>assert.deepEqual(await run('',{fail:true}),['pause','resume']));
+test('disabled interception leaves browser alone',async()=>assert.deepEqual(await run('',{disabled:true}),[]));
+test('blob download remains in browser',async()=>assert.deepEqual(await run('',{url:'blob:https://example.com/id'}),[]));

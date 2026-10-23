@@ -47,6 +47,7 @@ cat > "$dev_app/Contents/Info.plist" <<EOF
 <key>CFBundleIconFile</key><string>icon.icns</string>
 <key>LSMinimumSystemVersion</key><string>12.0</string>
 <key>NSHighResolutionCapable</key><true/>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>tdm</string></array></dict></array>
 </dict></plist>
 EOF
 /usr/bin/codesign --force --sign - --identifier com.tdm.downloader.dev "$dev_app"

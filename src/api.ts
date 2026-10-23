@@ -17,9 +17,10 @@ export const EVT_NEW_TASK = "tdm://new-task";
 export const EVT_QUICK_OPEN = "tdm://quick-open";
 
 export interface QuickOpenContext {
-  mode: "manual" | "clipboard" | "tasks";
+  mode: "manual" | "clipboard" | "browser" | "tasks";
   url: string | null;
   filename: string | null;
+  request_id?: string | null;
 }
 
 export interface NotificationStatus {
@@ -32,6 +33,8 @@ export interface NotificationStatus {
 }
 
 export const api = {
+  quickWindowReady: () => invoke<void>("quick_window_ready"),
+  browserDecision: (requestId: string, accepted: boolean) => invoke<void>("browser_download_decision", { requestId, accepted }),
   startDownload: (req: NewTaskRequest) =>
     invoke<DownloadTask>("start_download", { req }),
 
@@ -90,6 +93,7 @@ export const api = {
   showQuickInput: () => invoke<void>("show_quick_input"),
   notificationStatus: () => invoke<NotificationStatus>("notification_status"),
   testDownloadNotification: () => invoke<string>("test_download_notification"),
+  openSafariConnector: () => invoke<void>("open_safari_connector"),
   openNotificationSettings: () => invoke<void>("open_notification_settings"),
 };
 

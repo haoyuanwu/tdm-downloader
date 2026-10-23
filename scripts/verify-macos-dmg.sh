@@ -30,4 +30,9 @@ actual_arch="$(lipo -archs "$app_dir/Contents/MacOS/$executable")"
   exit 1
 }
 codesign --verify --deep --strict --verbose=2 "$app_dir"
+safari_app="$app_dir/Contents/Resources/safari/TDM Safari Connector.app"
+[[ -f "$safari_app/Contents/MacOS/TDM Safari Connector" ]] || { echo "DMG 缺少 Safari 扩展安装器" >&2; exit 1; }
+lipo -verify_arch arm64 x86_64 "$safari_app/Contents/MacOS/TDM Safari Connector"
+lipo -verify_arch arm64 x86_64 "$safari_app/Contents/PlugIns/TDM Safari Connector Extension.appex/Contents/MacOS/TDM Safari Connector Extension"
+codesign --verify --deep --strict "$safari_app"
 echo "DMG 内容校验通过：版本 ${version}，架构 ${actual_arch}，完整应用签名有效"

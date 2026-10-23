@@ -3,6 +3,8 @@
 //! 功能对标 TDM Fast（已逆向分析），但代码与 UI 完全自研。
 
 mod clipboard;
+mod browser_bridge;
+mod safari_extension;
 pub mod engine;
 pub mod models;
 mod notifications;
@@ -26,13 +28,37 @@ struct QuickOpenPayload {
     mode: String,
     url: Option<String>,
     filename: Option<String>,
+    request_id: Option<String>,
 }
 
 #[derive(Default)]
 struct QuickWindowState(
     std::sync::Mutex<QuickOpenPayload>,
     std::sync::Mutex<Option<popup_position::Rect>>,
+    std::sync::atomic::AtomicBool,
+    std::sync::atomic::AtomicBool,
 );
+
+/// 前端提交了实际内容后才显示原生窗口，冷启动时不会展示未加载的 WebView。
+#[tauri::command]
+fn quick_window_ready(app: tauri::AppHandle) {
+    let state = app.state::<QuickWindowState>();
+    state.2.store(true, std::sync::atomic::Ordering::Release);
+    if state.3.load(std::sync::atomic::Ordering::Acquire) {
+        if let Some(window) = app.get_webview_window("quick") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
+#[tauri::command]
+fn frontend_health(label: String, message: String) {
+    use std::io::Write;
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(std::env::temp_dir().join("tdm-webview-health.log")) {
+        let _ = writeln!(file, "{}: {}", label, message.chars().take(1200).collect::<String>());
+    }
+}
 
 /// 新建下载任务
 #[tauri::command]
@@ -356,6 +382,9 @@ fn show_quick_input(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn hide_quick_window(app: tauri::AppHandle) -> Result<(), String> {
+    app.state::<QuickWindowState>().3.store(false, std::sync::atomic::Ordering::Release);
+    let pending = app.state::<QuickWindowState>().0.lock().ok().and_then(|state| state.request_id.clone());
+    if let Some(id) = pending { let _ = browser_bridge::browser_download_decision(app.clone(), id, false); }
     if let Some(w) = app.get_webview_window("quick") {
         w.hide().map_err(|e| e.to_string())?;
     }
@@ -463,6 +492,13 @@ pub fn run() {
     let engine = Arc::new(DownloadEngine::new());
 
     tauri::Builder::default()
+        .on_page_load(|webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                let label = webview.label().to_string();
+                let code = format!(r#"setTimeout(() => window.__TAURI_INTERNALS__.invoke('frontend_health', {{label: {label:?}, message: JSON.stringify({{path:location.pathname, scripts:[...document.scripts].map(s=>s.getAttribute('src')), root:document.getElementById('root')?.innerText?.slice(0,350), boot:window.__tdmBootError || null}})}}).catch(()=>{{}}), 800);"#);
+                let _ = webview.eval(code);
+            }
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -474,6 +510,7 @@ pub fn run() {
         .manage(notifications::NotificationState::default())
         .invoke_handler(tauri::generate_handler![
             start_download,
+            frontend_health,
             list_tasks,
             pause_task,
             resume_task,
@@ -498,8 +535,11 @@ pub fn run() {
             copy_text,
             quick_clipboard_hint,
             quick_open_context,
+            quick_window_ready,
             show_quick_input,
             hide_quick_window,
+            browser_bridge::browser_download_decision,
+            safari_extension::open_safari_connector,
             notifications::notification_status,
             notifications::test_download_notification,
             notifications::open_notification_settings,
@@ -508,7 +548,7 @@ pub fn run() {
             tauri::WebviewWindowBuilder::new(
                 app,
                 "quick",
-                tauri::WebviewUrl::App("index.html?quick=1".into()),
+                tauri::WebviewUrl::App("quick.html".into()),
             )
             .title("快速下载")
             .inner_size(380.0, 174.0)
@@ -534,6 +574,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = &event {
+                let _ = show_main_window(app.clone());
+            }
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                for url in urls { browser_bridge::receive(app, url); }
+            }
             // 关闭窗口时按设置最小化到托盘，而不是退出
             if let tauri::RunEvent::WindowEvent { label, event, .. } = event {
                 if label == "quick" {
@@ -724,6 +772,7 @@ fn show_quick_window(app: &tauri::AppHandle, candidate: Option<clipboard::Clipbo
             mode: "clipboard".to_string(),
             url: Some(candidate.url),
             filename: Some(candidate.filename),
+            request_id: None,
         },
         None => QuickOpenPayload {
             mode: "manual".to_string(),
@@ -747,6 +796,8 @@ fn present_quick_window_at(
     payload: QuickOpenPayload,
     anchor: Option<popup_position::Anchor>,
 ) {
+    let pending = app.state::<QuickWindowState>().0.lock().ok().and_then(|state| state.request_id.clone());
+    if let Some(id) = pending { let _ = browser_bridge::browser_download_decision(app.clone(), id, false); }
     if let Ok(mut current) = app.state::<QuickWindowState>().0.lock() {
         *current = payload.clone();
     }
@@ -766,8 +817,9 @@ fn present_quick_window_at(
     } else {
         let _ = w.set_size(tauri::LogicalSize::new(380.0, height));
     }
-    let _ = w.show();
-    let _ = w.set_focus();
+    let state = app.state::<QuickWindowState>();
+    state.3.store(true, std::sync::atomic::Ordering::Release);
+    // 始终先交付数据；前端完成渲染后通过 quick_window_ready 显示。
     let _ = app.emit_to("quick", EVT_QUICK_OPEN, payload);
 }
 

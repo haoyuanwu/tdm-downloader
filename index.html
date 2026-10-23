@@ -6,7 +6,15 @@
     <title>TDM Downloader</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><p style="padding:24px;font:14px -apple-system,sans-serif">正在启动 TDM…</p></div>
+    <script>
+      window.addEventListener('error', function(event) {
+        window.__tdmBootError = event.message || ('资源加载失败: ' + (event.target && event.target.getAttribute && event.target.getAttribute('src')));
+        if (!document.querySelector('#root main, #root .app')) {
+          document.getElementById('root').textContent = '界面加载失败，请退出并重新打开应用。' + window.__tdmBootError;
+        }
+      }, true);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

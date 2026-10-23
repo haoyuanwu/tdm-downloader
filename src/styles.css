@@ -941,3 +941,22 @@ h1 > span { display: inline-flex; vertical-align: middle; padding: 3px 8px; marg
  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
  .progress-bar.is-indeterminate .progress-fill { transform: translateX(110%); }
 }
+
+/* Safari extension onboarding */
+.safari-guide-action { display:flex; flex-wrap:wrap; align-items:center; gap:16px; padding:18px; margin:20px 0; border:1px solid var(--border); border-radius:12px; }
+.safari-guide-action > div { flex:1; min-width:180px; }
+.safari-guide-action .btn { display:inline-flex; align-items:center; gap:8px; }
+.safari-guide-steps { padding-left:26px; margin:24px 0; }
+.safari-guide-steps li { padding-left:8px; margin-bottom:20px; }
+.safari-guide-steps li::marker { color:var(--text-dim); font-weight:600; }
+.safari-guide-steps p, .safari-guide-details p { font-size:13px; line-height:1.7; color:var(--text-dim); margin:7px 0 0; }
+.safari-guide-details { padding:14px 0; border-top:1px solid var(--border); font-size:13px; }
+.safari-guide-details summary { cursor:pointer; font-weight:600; line-height:1.6; }
+
+.browser-guide-switch { display:flex; gap:8px; margin-bottom:24px; }
+.browser-guide-switch .btn { min-height:36px; }
+.browser-guide-switch .btn.is-selected, .browser-guide-switch .btn.is-selected:hover { background:var(--primary); border-color:var(--primary); color:#fff; }
+.browser-guide-command { white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; padding:12px; margin:12px 0; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:12px; line-height:1.7; }
+.browser-launch-help { padding:16px; margin:18px 0; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
+.browser-launch-help p { margin:8px 0 0; color:var(--text-dim); font-size:13px; line-height:1.7; }
+.browser-launch-help kbd { display:inline-block; padding:1px 6px; border:1px solid var(--border); border-radius:5px; background:var(--bg-elev); color:var(--text); font-family:inherit; white-space:nowrap; }

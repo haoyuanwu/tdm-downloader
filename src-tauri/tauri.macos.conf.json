@@ -1,10 +1,15 @@
 {
   "build": {
-    "runner": "../scripts/macos-dev-runner.sh"
+    "runner": "../scripts/macos-dev-runner.sh",
+    "beforeBuildCommand": "bash scripts/build-safari-extension.sh && npm run build"
   },
   "bundle": {
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "infoPlist": "Info.plist"
+    },
+    "resources": {
+      "../release/safari/TDM Safari Connector.app/": "safari/TDM Safari Connector.app/"
     }
   }
 }

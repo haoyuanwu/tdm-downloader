@@ -24,20 +24,24 @@ export default function QuickDownload() {
   const [error, setError] = useState("");
   const [mode, setMode] = useState<QuickOpenContext["mode"]>("manual");
   const [filename, setFilename] = useState("");
+  const [revision, setRevision] = useState(0);
   const field = useRef<HTMLInputElement>(null);
   const refreshId = useRef(0);
+  const requestId = useRef<string | null>(null);
   const [theme, setTheme] = useState<ThemeMode>(DEFAULT_SETTINGS.theme);
   useTheme(theme);
 
   const refresh = useCallback(async (context: QuickOpenContext) => {
     const id = ++refreshId.current;
-    const automatic = context.mode === "clipboard" && Boolean(context.url);
+    requestId.current = context.request_id ?? null;
+    const automatic = ["clipboard", "browser"].includes(context.mode) && Boolean(context.url);
     const nextMode = context.mode === "tasks" ? "tasks" : automatic ? "clipboard" : "manual";
     setMode(nextMode);
     setFilename(context.filename || "");
     setValue(automatic ? context.url! : "");
     setError("");
     setHint(null);
+    setRevision((previous) => previous + 1);
     if (nextMode === "manual") requestAnimationFrame(() => field.current?.focus());
     const settings = await api.getSettings().catch(() => null);
     if (settings) setTheme(settings.theme);
@@ -50,13 +54,23 @@ export default function QuickDownload() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let active = true;
-    void listen<QuickOpenContext>(EVT_QUICK_OPEN, (event) => { void refresh(event.payload); }).then((fn) => {
-      if (active) unlisten = fn;
-      else fn();
-    });
-    void api.quickOpenContext().then(refresh).catch(() => {});
+    // 先订阅，再读取快照：消除初始快照覆盖新事件和冷启动事件丢失的竞态。
+    void (async () => {
+      const stop = await listen<QuickOpenContext>(EVT_QUICK_OPEN, (event) => { if (active) void refresh(event.payload); });
+      if (!active) { stop(); return; }
+      unlisten = stop;
+      const version = refreshId.current;
+      const context = await api.quickOpenContext();
+      if (active && version === refreshId.current) await refresh(context);
+    })().catch((reason) => { if (active) { setError(String(reason)); setRevision(1); } });
     return () => { active = false; unlisten?.(); };
   }, [refresh]);
+
+  useEffect(() => {
+    if (!revision) return;
+    // effect 在 React 提交后运行；隐藏的 WebView 可能不调度动画帧，不能等待 rAF。
+    void api.quickWindowReady().catch((reason) => setError(String(reason)));
+  }, [revision]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -76,6 +90,7 @@ export default function QuickDownload() {
     setError("");
     try {
       await api.startDownload({ url, dir: "" });
+      if (requestId.current) await api.browserDecision(requestId.current, true);
       await api.hideQuickWindow();
     } catch (e) {
       setError(String(e));
@@ -84,7 +99,9 @@ export default function QuickDownload() {
     }
   };
 
-  const dismiss = () => { void api.hideQuickWindow(); };
+  const dismiss = () => {
+    void (async () => { if (requestId.current) await api.browserDecision(requestId.current, false); await api.hideQuickWindow(); })().catch((reason) => setError(String(reason)));
+  };
 
   if (mode === "tasks") return <QuickTaskList />;
 

@@ -10,7 +10,7 @@ if [[ "$(uname -s)" != Darwin ]]; then
   echo "此脚本只能在 macOS 上运行" >&2
   exit 1
 fi
-for command_name in node npm rustup lipo hdiutil shasum git gh codesign; do
+for command_name in node npm rustup lipo hdiutil shasum git gh codesign ditto xcodebuild; do
   command -v "$command_name" >/dev/null || { echo "缺少命令：$command_name" >&2; exit 1; }
 done
 gh auth status >/dev/null
@@ -104,8 +104,18 @@ build_dmg x86_64-apple-darwin x86_64
 
 arm_dmg="release/TDM-Downloader_${version}_macos_arm64.dmg"
 x86_dmg="release/TDM-Downloader_${version}_macos_x86_64.dmg"
+extension_zip="release/TDM-Browser-Extensions_${version}.zip"
+extension_stage="$(mktemp -d)"
+mkdir -p "$extension_stage/browser-extension" "$extension_stage/scripts"
+ditto browser-extension/chrome "$extension_stage/browser-extension/chrome"
+ditto browser-extension/native "$extension_stage/browser-extension/native"
+cp browser-extension/README.md "$extension_stage/README.md"
+cp scripts/install-chrome-bridge.sh "$extension_stage/scripts/"
+ditto -c -k "$extension_stage" "$extension_zip"
+rm -rf "$extension_stage"
 arm_sha="$(shasum -a 256 "$arm_dmg" | awk '{print $1}')"
 x86_sha="$(shasum -a 256 "$x86_dmg" | awk '{print $1}')"
+extension_sha="$(shasum -a 256 "$extension_zip" | awk '{print $1}')"
 notes_file="$(mktemp)"
 trap 'rm -f "$notes_file"' EXIT
 cat > "$notes_file" <<EOF
@@ -117,6 +127,9 @@ $release_changes
 | --- | --- | --- |
 | $(basename "$arm_dmg") | Apple 芯片 (arm64) | $arm_sha |
 | $(basename "$x86_dmg") | Intel (x86_64) | $x86_sha |
+| $(basename "$extension_zip") | Chrome 扩展与 macOS 本地连接器 | $extension_sha |
+
+Safari 扩展安装器随 DMG 内的应用提供，入口：设置 → 浏览器扩展。Chrome 请解压扩展压缩包，按应用教程加载 browser-extension/chrome，并使用 scripts/install-chrome-bridge.sh 安装连接器（需要 Xcode Command Line Tools 和 Python 3）。浏览器内默认按 Shift + Command + D 打开助手弹窗；临时签名 Safari 扩展需手动启用，部分版本需允许未签名扩展。
 
 应用采用完整应用包临时签名（ad-hoc），已验证包内签名完整性；未进行 Developer ID 发行签名和 Apple 公证。首次打开时仍可能需要在系统设置的“隐私与安全性”中允许运行。
 EOF
@@ -128,10 +141,10 @@ fi
 git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin "$tag"
 
 if gh release view "$tag" >/dev/null 2>&1; then
-  gh release upload "$tag" "$arm_dmg" "$x86_dmg" --clobber
+  gh release upload "$tag" "$arm_dmg" "$x86_dmg" "$extension_zip" --clobber
   gh release edit "$tag" --notes-file "$notes_file" --draft=false
 else
-  gh release create "$tag" "$arm_dmg" "$x86_dmg" --draft --title "$tag" --notes-file "$notes_file"
+  gh release create "$tag" "$arm_dmg" "$x86_dmg" "$extension_zip" --draft --title "$tag" --notes-file "$notes_file"
   gh release edit "$tag" --draft=false
 fi
 

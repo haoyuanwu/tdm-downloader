@@ -6,8 +6,8 @@
 
 **下载**：
 
-- macOS v0.2.6 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.6/TDM-Downloader_0.2.6_macos_arm64.dmg)
-- macOS v0.2.6 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.6/TDM-Downloader_0.2.6_macos_x86_64.dmg)
+- macOS v0.2.7 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Downloader_0.2.7_macos_arm64.dmg)
+- macOS v0.2.7 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Downloader_0.2.7_macos_x86_64.dmg)
 - Windows v0.2.2 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe)
 - [版本发布列表（GitHub Releases）](https://github.com/haoyuanwu/tdm-downloader/releases)：下载各平台安装包、查看更新说明及历史版本
 
@@ -70,7 +70,7 @@
 
 ### macOS：DMG
 
-按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.6/TDM-Downloader_0.2.6_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.6/TDM-Downloader_0.2.6_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
+按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Downloader_0.2.7_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Downloader_0.2.7_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
 
 ### Windows 方式 A：安装包（推荐）
 
@@ -195,7 +195,6 @@ Tauri 打包的 Rust 程序偶发误报。可以下载源码自行编译，或�
 ## 九、后续计划
 
 - 系统托盘菜单 + 任务栏进度条
-- 浏览器接管（`tdm:` 协议 + 浏览器扩展）
 - 批量链接导入
 - 视频站点 / 磁力链接支持
 
@@ -207,3 +206,12 @@ Tauri 打包的 Rust 程序偶发误报。可以下载源码自行编译，或�
 - 后端约 2000 行 Rust，前端约 850 行 TypeScript，含内置 Range 服务器的集成测试
 - 代码结构、IPC 接口、测试说明见 `README.md`
 - 详细命令手册见 `COMMANDS.md`
+
+## 浏览器下载助手
+
+macOS v0.2.7 新增 Chrome 与 Safari 扩展接管：浏览器触发下载后打开 TDM 确认窗，确认后建立任务。
+
+- Safari：软件「设置 → 浏览器扩展 → Safari → 打开扩展安装器」，按教程启用「TDM 下载助手」并授权网站。临时签名版可能需要手动允许未签名扩展。
+- Chrome：[下载扩展与连接器](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.7/TDM-Browser-Extensions_0.2.7.zip)，解压后按软件中的 Chrome 教程加载扩展、使用扩展 ID 安装本地连接器。连接器安装需要 Xcode Command Line Tools 和 Python 3。
+- 浏览器内按 **Shift + Command + D** 打开助手弹窗，也可以通过工具栏图标打开，使用「自动接管下载」开关。快捷键冲突时按教程调整或点击图标。
+- 仅支持普通 HTTP/HTTPS 文件；不支持 blob/data 链接，依赖登录态或特殊请求头的下载可能无法接管。Safari 部分脚本下载按钮无法自动识别，可尝试右键链接「使用 TDM 下载此链接」。
