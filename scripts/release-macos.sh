@@ -66,34 +66,34 @@ fi
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
 mkdir -p release
 
+build_prepared=false
+prepare_build() {
+  if [[ "$build_prepared" == false ]]; then
+    echo "构建共享的前端与 Safari 扩展（仅执行一次）……"
+    npm run build
+    bash scripts/build-safari-extension.sh
+    build_prepared=true
+  fi
+}
+
 build_dmg() {
-  local target="$1" label="$2" bundle_dir dmg_dir app_binary source_dmg output_dmg actual_arch
+  local target="$1" label="$2" bundle_dir app_dir output_dmg
   bundle_dir="src-tauri/target/$target/release/bundle"
-  dmg_dir="$bundle_dir/dmg"
-  app_binary="src-tauri/target/$target/release/tdm-downloader"
+  app_dir="$bundle_dir/macos/TDM Downloader.app"
   output_dmg="release/TDM-Downloader_${version}_macos_${label}.dmg"
-  if [[ "$reuse_existing" == true && -f "$app_binary" && -f "$output_dmg" ]]; then
-    [[ "$(lipo -archs "$app_binary")" == "$label" ]] || { echo "$label 架构不匹配" >&2; exit 1; }
+  if [[ "$reuse_existing" == true && -f "$output_dmg" ]]; then
     hdiutil verify "$output_dmg" >/dev/null
     bash scripts/verify-macos-dmg.sh "$output_dmg" "$label" "$version"
     echo "复用已生成的 $output_dmg"
     return
   fi
-  rm -rf "$dmg_dir"
+  prepare_build
   echo "正在构建 $label ($target)……"
-  npm run tauri -- build --target "$target" --bundles dmg --ci
-
-  # Tauri 生成 DMG 后会清理临时 .app，发布版可执行文件仍保留在 release/。
-  [[ -f "$app_binary" ]] || { echo "找不到应用可执行文件：$app_binary" >&2; exit 1; }
-  actual_arch="$(lipo -archs "$app_binary")"
-  if [[ "$actual_arch" != "$label" ]]; then
-    echo "架构不匹配：预期 $label，实际 $actual_arch" >&2
-    exit 1
-  fi
-
-  source_dmg="$(find "$dmg_dir" -maxdepth 1 -type f -name "*.dmg" -print -quit)"
-  [[ -n "$source_dmg" ]] || { echo "找不到 $label DMG" >&2; exit 1; }
-  cp "$source_dmg" "$output_dmg"
+  # 只生成已签名的 .app；跳过 Tauri 会操作 Finder 的 DMG 美化流程。
+  # 前端与 Safari 资源已经准备好，两个架构不再重复执行 beforeBuildCommand。
+  npm run tauri -- build --target "$target" --bundles app --ci \
+    --config '{"build":{"beforeBuildCommand":""}}'
+  bash scripts/package-macos-dmg.sh "$app_dir" "$output_dmg"
   hdiutil verify "$output_dmg" >/dev/null
   bash scripts/verify-macos-dmg.sh "$output_dmg" "$label" "$version"
   echo "已生成：$output_dmg"
@@ -111,7 +111,7 @@ ditto browser-extension/chrome "$extension_stage/browser-extension/chrome"
 ditto browser-extension/native "$extension_stage/browser-extension/native"
 cp browser-extension/README.md "$extension_stage/README.md"
 cp scripts/install-chrome-bridge.sh "$extension_stage/scripts/"
-ditto -c -k "$extension_stage" "$extension_zip"
+ditto -c -k --norsrc --noextattr "$extension_stage" "$extension_zip"
 rm -rf "$extension_stage"
 arm_sha="$(shasum -a 256 "$arm_dmg" | awk '{print $1}')"
 x86_sha="$(shasum -a 256 "$x86_dmg" | awk '{print $1}')"
