@@ -24,7 +24,11 @@ fn parse(url: &Url) -> Result<super::QuickOpenPayload, String> {
 
 pub fn receive(app: &tauri::AppHandle, url: &Url) {
     match parse(url) {
-        Ok(payload) => super::present_quick_window(app, payload),
+        Ok(payload) => {
+            // Set this before scheduling AppKit work: Reopen may arrive first.
+            app.state::<super::BrowserWakeState>().0.store(true, std::sync::atomic::Ordering::Release);
+            super::present_quick_window(app, payload);
+        }
         Err(error) => eprintln!("浏览器接管失败：{error}"),
     }
 }

@@ -1,5 +1,5 @@
 import { Icon } from "./components/Icon";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, EVT_QUICK_OPEN } from "./api";
 import type { QuickOpenContext } from "./api";
@@ -66,9 +66,9 @@ export default function QuickDownload() {
     return () => { active = false; unlisten?.(); };
   }, [refresh]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!revision) return;
-    // effect 在 React 提交后运行；隐藏的 WebView 可能不调度动画帧，不能等待 rAF。
+    // DOM 提交后立即通知；隐藏的 WKWebView 可能推迟绘制和被动 effect。
     void api.quickWindowReady().catch((reason) => setError(String(reason)));
   }, [revision]);
 

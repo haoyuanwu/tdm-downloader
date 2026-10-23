@@ -24,6 +24,9 @@ pub const EVT_QUICK_OPEN: &str = "tdm://quick-open";
 #[derive(Default)]
 struct ClipboardState(std::sync::Mutex<Option<clipboard::ClipboardCandidate>>);
 
+#[derive(Default)]
+struct BrowserWakeState(std::sync::atomic::AtomicBool);
+
 #[derive(Clone, serde::Serialize, Default)]
 struct QuickOpenPayload {
     mode: String,
@@ -43,10 +46,13 @@ struct QuickWindowState(
 /// 前端提交了实际内容后才显示原生窗口，冷启动时不会展示未加载的 WebView。
 #[tauri::command]
 fn quick_window_ready(app: tauri::AppHandle) {
+    trace_quick_window(&app, "frontend-ready");
     let state = app.state::<QuickWindowState>();
     state.2.store(true, std::sync::atomic::Ordering::Release);
     if state.3.load(std::sync::atomic::Ordering::Acquire) {
         if let Some(window) = app.get_webview_window("quick") {
+            #[cfg(target_os = "macos")]
+            let _ = app.show();
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -54,11 +60,21 @@ fn quick_window_ready(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn frontend_health(label: String, message: String) {
+fn frontend_health(app: tauri::AppHandle, label: String, message: String) {
     use std::io::Write;
     if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(std::env::temp_dir().join("tdm-webview-health.log")) {
-        let _ = writeln!(file, "{}: {}", label, message.chars().take(1200).collect::<String>());
+        let native = app.get_webview_window(&label).map(|window| format!(
+            " visible={} focused={}", window.is_visible().unwrap_or(false), window.is_focused().unwrap_or(false))).unwrap_or_default();
+        let _ = writeln!(file, "{}: {}{}", label, message.chars().take(1200).collect::<String>(), native);
     }
+}
+
+fn trace_quick_window(app: &tauri::AppHandle, event: &str) {
+    let state = app.state::<QuickWindowState>();
+    let browser = app.state::<BrowserWakeState>().0.load(std::sync::atomic::Ordering::Acquire);
+    let ready = state.2.load(std::sync::atomic::Ordering::Acquire);
+    let requested = state.3.load(std::sync::atomic::Ordering::Acquire);
+    frontend_health(app.clone(), "quick".into(), format!("{event}: browser={browser} ready={ready} requested={requested}"));
 }
 
 /// 新建下载任务
@@ -326,6 +342,7 @@ fn set_progress_bar(window: tauri::WebviewWindow, progress: Option<f64>) -> Resu
 /// 显示并聚焦主窗口（托盘菜单用）
 #[tauri::command]
 fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    trace_quick_window(&app, "show-main");
     let _ = hide_quick_window(app.clone());
     show_dock(&app);
     if let Some(w) = app.get_webview_window("main") {
@@ -383,6 +400,8 @@ fn show_quick_input(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn hide_quick_window(app: tauri::AppHandle) -> Result<(), String> {
+    trace_quick_window(&app, "hide");
+    app.state::<BrowserWakeState>().0.store(false, std::sync::atomic::Ordering::Release);
     app.state::<QuickWindowState>().3.store(false, std::sync::atomic::Ordering::Release);
     let pending = app.state::<QuickWindowState>().0.lock().ok().and_then(|state| state.request_id.clone());
     if let Some(id) = pending { let _ = browser_bridge::browser_download_decision(app.clone(), id, false); }
@@ -506,6 +525,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(engine)
         .manage(ClipboardState::default())
+        .manage(BrowserWakeState::default())
         .manage(QuickWindowState::default())
         .manage(tray_progress::TrayProgressState::default())
         .manage(notifications::NotificationState::default())
@@ -583,7 +603,20 @@ pub fn run() {
         .run(|app, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = &event {
-                let _ = show_main_window(app.clone());
+                // Opening a URL also activates/reopens the app. Do not interpret
+                // that activation as a request to dismiss its download dialog.
+                if app.state::<BrowserWakeState>().0.load(std::sync::atomic::Ordering::Acquire) {
+                    let state = app.state::<QuickWindowState>();
+                    if state.2.load(std::sync::atomic::Ordering::Acquire)
+                        && state.3.load(std::sync::atomic::Ordering::Acquire) {
+                        if let Some(window) = app.get_webview_window("quick") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                } else {
+                    let _ = show_main_window(app.clone());
+                }
             }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = &event {
@@ -598,7 +631,11 @@ pub fn run() {
                             let _ = hide_quick_window(app.clone());
                         }
                         tauri::WindowEvent::Focused(false) => {
-                            let _ = hide_quick_window(app.clone());
+                            // Browser confirmation requires an explicit choice;
+                            // activation races or switching apps must not cancel it.
+                            if !app.state::<BrowserWakeState>().0.load(std::sync::atomic::Ordering::Acquire) {
+                                let _ = hide_quick_window(app.clone());
+                            }
                         }
                         _ => {}
                     }
@@ -803,6 +840,11 @@ fn present_quick_window_at(
     payload: QuickOpenPayload,
     anchor: Option<popup_position::Anchor>,
 ) {
+    let browser = app.state::<BrowserWakeState>();
+    if payload.mode == "clipboard" && browser.0.load(std::sync::atomic::Ordering::Acquire) {
+        return;
+    }
+    browser.0.store(payload.mode == "browser", std::sync::atomic::Ordering::Release);
     let pending = app.state::<QuickWindowState>().0.lock().ok().and_then(|state| state.request_id.clone());
     if let Some(id) = pending { let _ = browser_bridge::browser_download_decision(app.clone(), id, false); }
     if let Ok(mut current) = app.state::<QuickWindowState>().0.lock() {
@@ -825,7 +867,9 @@ fn present_quick_window_at(
         let _ = w.set_size(tauri::LogicalSize::new(380.0, height));
     }
     let state = app.state::<QuickWindowState>();
+    state.2.store(false, std::sync::atomic::Ordering::Release);
     state.3.store(true, std::sync::atomic::Ordering::Release);
+    trace_quick_window(app, "deliver-context");
     // 始终先交付数据；前端完成渲染后通过 quick_window_ready 显示。
     let _ = app.emit_to("quick", EVT_QUICK_OPEN, payload);
 }
