@@ -37,4 +37,8 @@ for safari_arch in arm64 x86_64; do
   lipo "$safari_app/Contents/PlugIns/TDM Safari Connector Extension.appex/Contents/MacOS/TDM Safari Connector Extension" -verify_arch "$safari_arch"
 done
 codesign --verify --deep --strict "$safari_app"
+[[ -f "$app_dir/Contents/Resources/browser/chrome/manifest.json" && -f "$app_dir/Contents/Resources/browser/native-version.json" ]] || { echo "DMG 缺少 Chrome 插件管理资源" >&2; exit 1; }
+for bridge_arch in arm64 x86_64; do
+  lipo "$app_dir/Contents/Resources/browser/tdm-browser-bridge" -verify_arch "$bridge_arch"
+done
 echo "DMG 内容校验通过：版本 ${version}，架构 ${actual_arch}，完整应用签名有效"

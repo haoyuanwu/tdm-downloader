@@ -1,7 +1,7 @@
 {
   "build": {
     "runner": "../scripts/macos-dev-runner.sh",
-    "beforeBuildCommand": "bash scripts/build-safari-extension.sh && npm run build"
+    "beforeBuildCommand": "bash scripts/build-browser-extensions.sh && npm run build"
   },
   "bundle": {
     "macOS": {
@@ -9,7 +9,10 @@
       "infoPlist": "Info.plist"
     },
     "resources": {
-      "../release/safari/TDM Safari Connector.app/": "safari/TDM Safari Connector.app/"
+      "../release/safari/TDM Safari Connector.app/": "safari/TDM Safari Connector.app/",
+      "../browser-extension/chrome/": "browser/chrome/",
+      "../release/browser-native/tdm-browser-bridge": "browser/tdm-browser-bridge",
+      "../browser-extension/native/version.json": "browser/native-version.json"
     }
   }
 }

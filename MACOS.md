@@ -21,7 +21,7 @@ npm run tauri build
 npm run release:macos
 ```
 
-脚本一次性构建共享的前端与 Safari 扩展，再分别构建 arm64 和 x86_64 的已签名应用，通过 `hdiutil create` 在后台生成 DMG。整个发布流程不调用 Finder / AppleScript，不打开安装窗口、不运行安装器。DMG 中保留应用与「Applications」目录快捷方式，可正常拖入安装。
+脚本一次性构建共享的前端、Safari 扩展与通用架构 Chrome 连接器，再分别构建 arm64 和 x86_64 的已签名应用，通过 `hdiutil create` 在后台生成 DMG。整个发布流程不调用 Finder / AppleScript，不打开安装窗口、不运行安装器。DMG 中保留应用与「Applications」目录快捷方式，可正常拖入安装。
 
 每个 DMG 只执行一次必要校验：映像完整性、只读隐藏挂载后的实际版本与架构、完整应用签名和内置 Safari 扩展。随后计算 SHA256，从更新日志提取中文说明，推送 `main` 与标签，并上传两个 DMG 和 Chrome 扩展压缩包。文件保存在 `release/`，同一版本已正式发布时需更新版本号。
 

@@ -47,10 +47,12 @@ cat > "$dev_app/Contents/Info.plist" <<EOF
 <key>CFBundleIconFile</key><string>icon.icns</string>
 <key>LSMinimumSystemVersion</key><string>12.0</string>
 <key>NSHighResolutionCapable</key><true/>
-<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>tdm</string></array></dict></array>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>tdm-dev</string></array></dict></array>
 </dict></plist>
 EOF
 /usr/bin/codesign --force --sign - --identifier com.tdm.downloader.dev "$dev_app"
+# Remove the old registration before registering the development-only scheme.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "$dev_app" || true
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$dev_app"
 echo "运行开发版：$dev_app"
 exec "$dev_app/Contents/MacOS/tdm-downloader" "$@"

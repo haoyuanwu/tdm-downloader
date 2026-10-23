@@ -32,6 +32,16 @@ export interface NotificationStatus {
   last_error: string | null;
 }
 
+export interface BrowserExtensionStatus {
+  chrome_version: string;
+  chrome_installed_version: string | null;
+  bridge_version: string;
+  bridge_installed_version: string | null;
+  safari_version: string;
+  chrome_extension_id: string | null;
+  chrome_directory: string;
+}
+
 export const api = {
   quickWindowReady: () => invoke<void>("quick_window_ready"),
   browserDecision: (requestId: string, accepted: boolean) => invoke<void>("browser_download_decision", { requestId, accepted }),
@@ -93,6 +103,10 @@ export const api = {
   showQuickInput: () => invoke<void>("show_quick_input"),
   notificationStatus: () => invoke<NotificationStatus>("notification_status"),
   testDownloadNotification: () => invoke<string>("test_download_notification"),
+  browserExtensionStatus: () => invoke<BrowserExtensionStatus>("browser_extension_status"),
+  prepareChromeExtension: () => invoke<BrowserExtensionStatus>("prepare_chrome_extension"),
+  configureChromeExtension: (extensionId: string) => invoke<BrowserExtensionStatus>("configure_chrome_extension", { extensionId }),
+  openChromeExtensionDirectory: () => invoke<void>("open_chrome_extension_directory"),
   openSafariConnector: () => invoke<void>("open_safari_connector"),
   openNotificationSettings: () => invoke<void>("open_notification_settings"),
 };

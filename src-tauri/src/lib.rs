@@ -5,6 +5,7 @@
 mod clipboard;
 mod browser_bridge;
 mod safari_extension;
+mod extension_manager;
 pub mod engine;
 pub mod models;
 mod notifications;
@@ -540,11 +541,16 @@ pub fn run() {
             hide_quick_window,
             browser_bridge::browser_download_decision,
             safari_extension::open_safari_connector,
+            extension_manager::browser_extension_status,
+            extension_manager::prepare_chrome_extension,
+            extension_manager::configure_chrome_extension,
+            extension_manager::open_chrome_extension_directory,
             notifications::notification_status,
             notifications::test_download_notification,
             notifications::open_notification_settings,
         ])
         .setup(|app| {
+            extension_manager::refresh_app_path();
             tauri::WebviewWindowBuilder::new(
                 app,
                 "quick",

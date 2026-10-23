@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Icon } from "./Icon";
 import { isWindows } from "../platform";
 
 export function SafariExtensionGuide() {
+  const [version, setVersion] = useState("");
+  useEffect(() => { void api.browserExtensionStatus().then((status) => setVersion(status.safari_version)).catch(() => {}); }, []);
   const [opening, setOpening] = useState(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
@@ -25,7 +27,7 @@ export function SafariExtensionGuide() {
     <h3 className="section-title" id="safari-guide-title">Safari 扩展</h3>
     <p className="dialog-subtitle">点击网页中的下载链接，在 TDM 中确认后开始下载。</p>
     <div className="safari-guide-action">
-      <div><strong>TDM Safari Connector</strong><p className="hint">扩展安装器随 macOS 版应用提供，首次使用需要手动启用。</p></div>
+      <div><strong>TDM Safari Connector</strong><p className="hint">{version ? `Safari 插件 v${version}，版本与 App 独立。` : "扩展版本与 App 独立。"}首次使用需要手动启用。</p></div>
       <button className="btn btn-primary" type="button" disabled={opening || isWindows} onClick={openConnector}><Icon name="external" size={16} />{opening ? "正在打开…" : "打开扩展安装器"}</button>
     </div>
     {isWindows && <p className="hint">Safari 扩展仅支持 macOS。</p>}
@@ -36,6 +38,7 @@ export function SafariExtensionGuide() {
       <p>也可点击 Safari 工具栏中的 TDM 扩展图标；图标未显示时，右键工具栏 → 自定工具栏，将 TDM 图标拖入工具栏。</p>
       <p>快捷键用于打开插件弹窗，首次启用与网站授权仍需在 Safari 设置中完成。更新后需重新载入扩展；若按键被其他功能占用，可先点击工具栏图标。</p>
     </div>
+    <p className="hint">App 正常覆盖更新、Safari 扩展版本不变时，通常无需重新启用；版本变化时点击上方安装器按钮完成更新。网站权限和浏览器要求的启用步骤仍在 Safari 中完成。</p>
     <ol className="safari-guide-steps">
       <li><strong>打开扩展设置</strong><p>点击上方按钮，再在安装器中点击「打开 Safari 扩展设置」。也可以进入 Safari → 设置（旧版为偏好设置）→ 扩展。</p></li>
       <li><strong>启用 TDM 扩展</strong><p>勾选「TDM 下载助手」（安装器名称为 TDM Safari Connector）。此试用版使用临时签名；若扩展未出现或无法启用，请按下方说明允许未签名扩展，再重新打开安装器。</p></li>

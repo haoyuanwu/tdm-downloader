@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TDM 下载助手",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "点击文件链接时唤起 TDM 确认下载。",
   "permissions": [
     "nativeMessaging",

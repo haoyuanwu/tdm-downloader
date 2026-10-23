@@ -960,3 +960,14 @@ h1 > span { display: inline-flex; vertical-align: middle; padding: 3px 8px; marg
 .browser-launch-help { padding:16px; margin:18px 0; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
 .browser-launch-help p { margin:8px 0 0; color:var(--text-dim); font-size:13px; line-height:1.7; }
 .browser-launch-help kbd { display:inline-block; padding:1px 6px; border:1px solid var(--border); border-radius:5px; background:var(--bg-elev); color:var(--text); font-family:inherit; white-space:nowrap; }
+
+.browser-extension-manager { padding:16px; margin:18px 0; border:1px solid var(--border); border-radius:10px; }
+.extension-versions { font-size:12px; margin:16px 0; }
+.extension-versions > div { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:8px 0; }
+.extension-versions dt { color:var(--text-dim); }
+.extension-versions dd { margin:0; }
+.extension-manager-actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+.extension-manager-actions input { flex:1; min-width:180px; width:100%; font-family:ui-monospace,monospace; font-size:12px; }
+.extension-id-label { display:block; font-size:12px; margin-top:16px; }
+.extension-directory { overflow-wrap:anywhere; user-select:text; }
+.extension-manager-actions input { padding:9px 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); }

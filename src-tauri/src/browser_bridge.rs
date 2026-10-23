@@ -3,7 +3,9 @@ use url::Url;
 use uuid::Uuid;
 
 fn parse(url: &Url) -> Result<super::QuickOpenPayload, String> {
-    if url.as_str().len() > 32768 || url.scheme() != "tdm" || url.host_str() != Some("download") {
+    let supported_scheme = url.scheme() == "tdm"
+        || (cfg!(debug_assertions) && url.scheme() == "tdm-dev");
+    if url.as_str().len() > 32768 || !supported_scheme || url.host_str() != Some("download") {
         return Err("无效的浏览器下载请求".into());
     }
     let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
