@@ -8,7 +8,7 @@
 
 Windows 适配说明与两端功能差异见 [WINDOWS.md](WINDOWS.md)。
 
-下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
+下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.5/TDM-Downloader_0.2.5_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.5/TDM-Downloader_0.2.5_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
 
 ## 特性
 

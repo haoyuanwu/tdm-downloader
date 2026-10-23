@@ -10,7 +10,7 @@ if [[ "$(uname -s)" != Darwin ]]; then
   echo "此脚本只能在 macOS 上运行" >&2
   exit 1
 fi
-for command_name in node npm rustup lipo hdiutil shasum git gh; do
+for command_name in node npm rustup lipo hdiutil shasum git gh codesign; do
   command -v "$command_name" >/dev/null || { echo "缺少命令：$command_name" >&2; exit 1; }
 done
 gh auth status >/dev/null
@@ -75,12 +75,13 @@ build_dmg() {
   if [[ "$reuse_existing" == true && -f "$app_binary" && -f "$output_dmg" ]]; then
     [[ "$(lipo -archs "$app_binary")" == "$label" ]] || { echo "$label 架构不匹配" >&2; exit 1; }
     hdiutil verify "$output_dmg" >/dev/null
+    bash scripts/verify-macos-dmg.sh "$output_dmg" "$label" "$version"
     echo "复用已生成的 $output_dmg"
     return
   fi
   rm -rf "$dmg_dir"
   echo "正在构建 $label ($target)……"
-  npm run tauri -- build --target "$target" --bundles dmg --ci --no-sign
+  npm run tauri -- build --target "$target" --bundles dmg --ci
 
   # Tauri 生成 DMG 后会清理临时 .app，发布版可执行文件仍保留在 release/。
   [[ -f "$app_binary" ]] || { echo "找不到应用可执行文件：$app_binary" >&2; exit 1; }
@@ -94,6 +95,7 @@ build_dmg() {
   [[ -n "$source_dmg" ]] || { echo "找不到 $label DMG" >&2; exit 1; }
   cp "$source_dmg" "$output_dmg"
   hdiutil verify "$output_dmg" >/dev/null
+  bash scripts/verify-macos-dmg.sh "$output_dmg" "$label" "$version"
   echo "已生成：$output_dmg"
 }
 
@@ -116,7 +118,7 @@ $release_changes
 | $(basename "$arm_dmg") | Apple 芯片 (arm64) | $arm_sha |
 | $(basename "$x86_dmg") | Intel (x86_64) | $x86_sha |
 
-安装包未进行 Apple 开发者签名和公证。首次打开时可能需要在系统设置的“隐私与安全性”中允许运行。
+应用采用完整应用包临时签名（ad-hoc），已验证包内签名完整性；未进行 Developer ID 发行签名和 Apple 公证。首次打开时仍可能需要在系统设置的“隐私与安全性”中允许运行。
 EOF
 
 git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main

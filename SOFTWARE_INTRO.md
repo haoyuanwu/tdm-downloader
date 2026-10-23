@@ -6,8 +6,8 @@
 
 **下载**：
 
-- macOS v0.2.4 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_arm64.dmg)
-- macOS v0.2.4 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_x86_64.dmg)
+- macOS v0.2.5 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.5/TDM-Downloader_0.2.5_macos_arm64.dmg)
+- macOS v0.2.5 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.5/TDM-Downloader_0.2.5_macos_x86_64.dmg)
 - Windows v0.2.2 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe)
 - [版本发布列表（GitHub Releases）](https://github.com/haoyuanwu/tdm-downloader/releases)：下载各平台安装包、查看更新说明及历史版本
 
@@ -70,7 +70,7 @@
 
 ### macOS：DMG
 
-按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.4/TDM-Downloader_0.2.4_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹。应用尚未经过 Apple 签名和公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
+按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.5/TDM-Downloader_0.2.5_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.5/TDM-Downloader_0.2.5_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
 
 ### Windows 方式 A：安装包（推荐）
 

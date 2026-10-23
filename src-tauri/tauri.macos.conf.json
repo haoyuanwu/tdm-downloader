@@ -1,5 +1,10 @@
 {
   "build": {
     "runner": "../scripts/macos-dev-runner.sh"
+  },
+  "bundle": {
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }

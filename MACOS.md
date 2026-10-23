@@ -21,9 +21,17 @@ npm run tauri build
 npm run release:macos
 ```
 
-脚本会安装所需 Rust 目标，分别构建 arm64 和 x86_64 的未签名 DMG，核对应用可执行文件架构与磁盘映像完整性，计算 SHA256，从更新日志提取本版本说明，推送 `main` 和版本标签，并上传到 GitHub Releases。文件也保存在 `release/`。同一版本已正式发布时，脚本会要求先更新版本号。
+脚本会安装所需 Rust 目标，分别构建 arm64 和 x86_64 的 DMG，默认给完整应用包添加临时签名（ad-hoc）。随后核对构建文件架构与磁盘映像完整性，再以只读方式挂载 DMG，确认其中实际安装的应用架构、版本号和完整应用签名，计算 SHA256，从更新日志提取本版本说明，推送 `main` 和版本标签，并上传到 GitHub Releases。文件也保存在 `release/`。同一版本已正式发布时，脚本会要求先更新版本号。
 
 如果构建已完成但上传中断，确认源码未变后可运行 `npm run release:macos -- --reuse-existing`，复用并再次校验已生成的 DMG。
+
+## Apple 芯片 Mac 提示“需要更新 App”
+
+若提示未来 macOS 版本不再支持此应用，请确认启动的不是此前安装的 Intel 版。退出旧应用后，从发布页下载文件名带 `macos_arm64.dmg` 的版本，拖入“应用程序”并选择替换；仅打开 DMG 不会更新已经安装的应用。随后从“应用程序”重新启动。可用下面的命令核对安装结果，Apple 芯片版应输出 `arm64`：
+
+```sh
+lipo -archs "/Applications/TDM Downloader.app/Contents/MacOS/tdm-downloader"
+```
 
 ## macOS 集成
 
@@ -42,4 +50,4 @@ npm run release:macos
 - `npm run tauri dev` 会在 `target/debug/` 中维护一个开发启动容器，让开发版以 “TDM Downloader Dev” 身份获得通知权限，继续支持 Vite 热重载和 Rust 自动重启。无需生成 DMG 或安装应用；正式版与开发版的通知权限分别管理。
 - “关机”在全部任务完成后等待 30 秒，再通过系统事件请求关机。macOS 可能要求授权自动化权限；“休眠”使用 `pmset sleepnow`。
 
-本地生成的 `.app` 未签名和公证。给其他 Mac 分发前需要使用自己的 Apple Developer 证书签名、公证。
+默认生成的 `.app` 使用临时签名，未进行 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。临时签名修复完整应用包的签名一致性，不等同于通过 Apple 的发行信任检查。要通过默认 Gatekeeper 检查，需要 Developer ID Application 证书及公证凭据；可按 [Tauri macOS 签名说明](https://v2.tauri.app/distribute/sign/macos/) 设置 `APPLE_SIGNING_IDENTITY` 与 Apple 公证环境变量后发布。
