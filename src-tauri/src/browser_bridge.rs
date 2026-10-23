@@ -27,7 +27,7 @@ pub fn receive(app: &tauri::AppHandle, url: &Url) {
         Ok(payload) => {
             // Set this before scheduling AppKit work: Reopen may arrive first.
             app.state::<super::BrowserWakeState>().0.store(true, std::sync::atomic::Ordering::Release);
-            super::present_quick_window(app, payload);
+            super::browser_dialog::present(app, payload);
         }
         Err(error) => eprintln!("浏览器接管失败：{error}"),
     }

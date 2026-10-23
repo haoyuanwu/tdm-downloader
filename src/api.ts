@@ -43,6 +43,8 @@ export interface BrowserExtensionStatus {
 }
 
 export const api = {
+  browserDialogContext: () => invoke<{ id: number; payload: QuickOpenContext } | null>("browser_dialog_context"),
+  finishBrowserDialog: (id: number, accepted: boolean) => invoke<void>("finish_browser_dialog", { id, accepted }),
   quickWindowReady: () => invoke<void>("quick_window_ready"),
   browserDecision: (requestId: string, accepted: boolean) => invoke<void>("browser_download_decision", { requestId, accepted }),
   startDownload: (req: NewTaskRequest) =>

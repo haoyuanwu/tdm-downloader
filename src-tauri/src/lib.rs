@@ -4,6 +4,7 @@
 
 mod clipboard;
 mod browser_bridge;
+mod browser_dialog;
 mod safari_extension;
 mod extension_manager;
 pub mod engine;
@@ -526,6 +527,7 @@ pub fn run() {
         .manage(engine)
         .manage(ClipboardState::default())
         .manage(BrowserWakeState::default())
+        .manage(browser_dialog::BrowserDialogState::default())
         .manage(QuickWindowState::default())
         .manage(tray_progress::TrayProgressState::default())
         .manage(notifications::NotificationState::default())
@@ -560,6 +562,8 @@ pub fn run() {
             show_quick_input,
             hide_quick_window,
             browser_bridge::browser_download_decision,
+            browser_dialog::browser_dialog_context,
+            browser_dialog::finish_browser_dialog,
             safari_extension::open_safari_connector,
             extension_manager::browser_extension_status,
             extension_manager::prepare_chrome_extension,

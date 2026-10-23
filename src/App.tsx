@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, onNewTask, onProgress, onTasks, onShowDownloads } from "./api";
+import { BrowserDownloadDialog } from "./components/BrowserDownloadDialog";
 import { NewDownloadDialog } from "./components/NewDownloadDialog";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { TaskCard } from "./components/TaskCard";
@@ -325,6 +326,7 @@ export default function App() {
         </footer>
       </main>
 
+      <BrowserDownloadDialog />
       {showNew && (
         <NewDownloadDialog
           settings={settings}
