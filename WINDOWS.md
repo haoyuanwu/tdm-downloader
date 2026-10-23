@@ -1,6 +1,6 @@
 # Windows 适配与 macOS 功能对照
 
-对照当前 v0.2.4 源码。README 中 Windows 下载链接仍指向 v0.2.2，不能用旧安装包判断当前源码是否支持功能。本次修改尚未发布新版本。
+已拉取远程 `main` 的 v0.3.0 源码（`92d7efb`），本轮主要补齐 Mac 新增的浏览器下载功能。本次 Windows 改动尚未发布；已发布的 Windows v0.2.4 不包含本轮新增功能。
 
 ## 两端已共用的功能
 
@@ -12,8 +12,23 @@
 - 托盘圆环进度、进行中任务数量及每 3 秒轮换任务进度，隐藏主窗口后继续刷新。
 - 跟随系统/深色/浅色主题、设置保存、关闭窗口留在后台。
 - 删除任务时保留文件或移入系统回收位置、记住选择、保留文件时保留续传分片。
+- 启动时隐藏到托盘、统一图标、对话框键盘操作、主页面居中的浏览器下载确认和约 600ms 显示延迟。
 
-## 本次补齐及修复
+## v0.3.0 本轮补齐
+
+| 功能 | Windows 实现 |
+| --- | --- |
+| 插件入口 | 设置中开放 Chrome / Edge 的一键准备、检查更新、打开固定目录、填写扩展 ID 和连接配置 |
+| 本地连接器 | 新增 Windows Rust EXE，按 Chrome Native Messaging 的长度前缀读取 JSON，校验 HTTP(S) 链接，启动配置的正式程序并等待确认结果 |
+| 冷启动与再次唤起 | 首次通过命令行接收下载请求；程序已运行时由单实例插件转交，避免每次浏览器下载都打开新进程和托盘图标 |
+| 确认与取消 | 复用 Mac 主窗口居中确认弹窗；建立任务成功后返回 accepted，取消返回 cancelled，120 秒无确认返回 timeout，由扩展恢复原下载 |
+| 当前用户注册 | 分别写入 Chrome / Edge 的 NativeMessagingHosts，允许指定扩展 ID；额外注册 `tdm://` 协议，无需管理员权限 |
+| 更新与迁移 | 插件、Windows 连接器、App 独立版本；不降级插件，保留 Chrome / Edge ID，正式 App 启动同步目标路径；连接器被占用时更新失败会保留原文件和版本号 |
+| 打包 | Windows 开发/打包前自动构建独立连接器，安装包附带 EXE、插件资源和连接器版本文件 |
+
+Safari 扩展和安装器只适用于 macOS，Windows 界面不显示该入口。Edge 使用 Chromium 扩展；首次加载插件、浏览器授权和更新后重新加载仍需用户操作。Windows 连接器不配置到依赖 Vite 的 debug 程序，使用正式构建验证冷启动。
+
+## v0.2.4 已完成的适配
 
 | 功能 | Windows 修改 |
 | --- | --- |
@@ -45,14 +60,16 @@
 | 文件与设置 | Finder；`~/Library/Application Support/tdm-downloader` | 资源管理器；优先 `%LOCALAPPDATA%/tdm-downloader` |
 | 分发 | arm64/x86_64 DMG、签名公证流程 | 当前以 Windows x64 NSIS 为主；安装包签名及 Windows 发布流程与 Mac 双架构发布脚本不同 |
 
-两端都尚未实现浏览器接管、磁力/BT、视频站点解析，属于共同缺项。
+浏览器接管已实现；两端都仅支持普通 HTTP(S) 文件，不自动读取登录 Cookie，也不接管 blob/data URL。磁力/BT、视频站点解析仍为共同缺项。
 
 ## 构建与验证
 
-Windows 使用 `npm run tauri build` 构建安装包；`npm run package` 额外将产物收集并命名到 `release/`。Tauri 自动合并 Windows 专用配置。
+Windows 使用 `npm run tauri build` 构建安装包；`npm run package` 额外将产物收集并命名到 `release/`。Tauri 自动合并 Windows 专用配置，并在构建前编译、收集连接器资源。仅运行 Rust 测试前，先运行 `node scripts/build-browser-windows.mjs` 准备资源。
 
-本次通过前端类型检查和生产构建、Windows Rust 编译及 13 项后端测试。新增定位测试覆盖底部任务栏、负坐标副屏和 100%/125%/150%/200% 缩放。
+浏览器资源是安装目录中的 `browser/` 文件夹。使用免安装版时应下载完整的 `*_portable.zip` 并整体解压，保留 EXE 与 `browser/` 的相邻位置；仅复制旧式的单个 `*_portable.exe` 不包含浏览器集成资源。
 
-仍需人工实测：安装版通知身份与横幅点击、系统通知设置跳转、实际提示音、多显示器/托盘溢出区交互。关机和睡眠仅检查编译与调用方式，没有实际执行。当前 Windows 环境无法验证 macOS 原生运行行为。
+验证包含前端类型检查与生产构建、Windows Rust 后端测试、原生连接器消息校验及真实子进程交接测试、浏览器扩展成功/取消/失败/超时回退测试。定位测试覆盖底部任务栏、负坐标副屏和 100%/125%/150%/200% 缩放。
+
+仍需人工实测：在 Chrome / Edge 首次加载扩展并点击真实网站下载、主窗口中接受/取消、系统协议唤起、安装版通知身份与横幅点击、多显示器/托盘溢出区交互。连接器自动测试使用隔离的临时目录与模拟应用，不修改真实浏览器注册表。关机和睡眠没有实际执行。当前 Windows 环境无法验证 macOS 原生运行行为。
 
 通知激活差异参考 [Microsoft 桌面通知文档](https://learn.microsoft.com/en-us/windows/apps/design/shell/tiles-and-notifications/send-local-toast-desktop-cpp-wrl)；当前组件行为见 `tauri-plugin-notification` 2.7 的 `desktop.rs` 文档。

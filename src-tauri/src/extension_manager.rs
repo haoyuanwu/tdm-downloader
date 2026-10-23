@@ -27,16 +27,21 @@ pub(crate) fn needs_update(installed: Option<&str>, available: &str) -> bool {
     }
 }
 
+#[cfg(not(windows))]
 fn home() -> Result<PathBuf, String> {
     std::env::var_os("HOME").map(PathBuf::from).ok_or("无法读取用户目录".into())
 }
 
 fn chrome_dir() -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    return std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+        .map(|path| path.join("TDM Browser Extensions/chrome")).ok_or("无法读取本地应用目录".into());
+    #[cfg(not(windows))]
     Ok(home()?.join("Library/Application Support/TDM Browser Extensions/chrome"))
 }
 
 fn bridge_dir() -> Result<PathBuf, String> {
-    Ok(home()?.join("Library/Application Support/TDM Browser Bridge"))
+    super::browser_paths::data_dir()
 }
 
 fn resource(app: &tauri::AppHandle, relative: &str) -> Result<PathBuf, String> {
@@ -49,8 +54,9 @@ fn resource(app: &tauri::AppHandle, relative: &str) -> Result<PathBuf, String> {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let path = match relative {
             "browser/chrome" => root.join("browser-extension/chrome"),
-            "browser/native-version.json" => root.join("browser-extension/native/version.json"),
+            "browser/native-version.json" => root.join(if cfg!(windows) { "browser-extension/native/windows-version.json" } else { "browser-extension/native/version.json" }),
             "browser/tdm-browser-bridge" => root.join("release/browser-native/tdm-browser-bridge"),
+            "browser/tdm-browser-bridge.exe" => root.join("release/browser-native-windows/tdm-browser-bridge.exe"),
             _ => return Err("未知扩展资源".into()),
         };
         if path.exists() { return Ok(path); }
@@ -63,12 +69,16 @@ fn valid_id(id: &str) -> bool {
 }
 
 fn registered_id() -> Option<String> {
+    #[cfg(windows)]
+    let path = bridge_dir().ok()?.join("com.tdm.downloader.bridge.json");
+    #[cfg(not(windows))]
     let path = home().ok()?.join("Library/Application Support/Google/Chrome/NativeMessagingHosts/com.tdm.downloader.bridge.json");
     let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
-    let id = manifest["allowed_origins"][0].as_str()?.strip_prefix("chrome-extension://")?.strip_suffix('/')?;
+    let id = manifest["allowed_origins"].as_array()?.last()?.as_str()?.strip_prefix("chrome-extension://")?.strip_suffix('/')?;
     valid_id(id).then(|| id.to_owned())
 }
 
+#[cfg(not(windows))]
 fn standalone_app() -> Result<PathBuf, String> {
     #[cfg(not(debug_assertions))]
     if let Some(path) = std::env::current_exe().ok().and_then(|exe| exe.ancestors()
@@ -85,12 +95,28 @@ fn standalone_app() -> Result<PathBuf, String> {
     Err("请先安装可独立运行的 TDM 正式版，浏览器连接器不应依赖开发服务器。".into())
 }
 
+#[cfg(windows)]
+fn standalone_app() -> Result<PathBuf, String> {
+    if cfg!(debug_assertions) {
+        return Err("请使用正式构建的 Windows 程序配置连接器，避免浏览器依赖开发服务器。".into());
+    }
+    std::env::current_exe().map_err(|e| e.to_string())
+}
+
+fn bridge_name() -> &'static str {
+    if cfg!(windows) { "tdm-browser-bridge.exe" } else { "tdm-browser-bridge" }
+}
+
 /// Refresh only the app path on app launch; extension files and IDs stay unchanged.
 pub fn refresh_app_path() {
-    #[cfg(all(target_os = "macos", not(debug_assertions)))]
+    #[cfg(all(any(windows, target_os = "macos"), not(debug_assertions)))]
     if let (Ok(directory), Ok(app_path)) = (bridge_dir(), standalone_app()) {
         if directory.join("app-path.txt").exists() {
             let _ = std::fs::write(directory.join("app-path.txt"), app_path.to_string_lossy().as_bytes());
+            #[cfg(windows)]
+            if directory.join("com.tdm.downloader.bridge.json").exists() {
+                let _ = register_windows_host(&directory.join("com.tdm.downloader.bridge.json"), &app_path);
+            }
         }
     }
 }
@@ -114,7 +140,7 @@ pub fn browser_extension_status(app: tauri::AppHandle) -> Result<ExtensionStatus
 
 #[tauri::command]
 pub fn prepare_chrome_extension(app: tauri::AppHandle) -> Result<ExtensionStatus, String> {
-    if !cfg!(target_os = "macos") { return Err("当前一键配置仅支持 macOS。".into()); }
+    if !cfg!(any(windows, target_os = "macos")) { return Err("当前平台不支持一键配置。".into()); }
     let status = browser_extension_status(app.clone())?;
     let chrome = resource(&app, "browser/chrome")?;
     let destination = chrome_dir()?;
@@ -129,15 +155,18 @@ pub fn prepare_chrome_extension(app: tauri::AppHandle) -> Result<ExtensionStatus
         // Publish version only after all extension files are present.
         std::fs::copy(chrome.join("manifest.json"), destination.join("manifest.json")).map_err(|e| e.to_string())?;
     }
-    if needs_update(status.bridge_installed_version.as_deref(), &status.bridge_version) || !bridge.join("tdm-browser-bridge").is_file() {
+    if needs_update(status.bridge_installed_version.as_deref(), &status.bridge_version) || !bridge.join(bridge_name()).is_file() {
         let pending = bridge.join("tdm-browser-bridge.update");
-        std::fs::copy(resource(&app, "browser/tdm-browser-bridge")?, &pending).map_err(|e| e.to_string())?;
+        let source = resource(&app, &format!("browser/{}", bridge_name()))?;
+        std::fs::copy(source, &pending).map_err(|e| e.to_string())?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&pending, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
         }
-        std::fs::rename(pending, bridge.join("tdm-browser-bridge")).map_err(|e| e.to_string())?;
+        let destination = bridge.join(bridge_name());
+        // rename 在 Windows 使用替换语义；若 EXE 仍在使用中，旧文件与版本号保持不变。
+        std::fs::rename(pending, destination).map_err(|e| format!("更新连接器失败，请完成浏览器确认后重试：{e}"))?;
         std::fs::copy(resource(&app, "browser/native-version.json")?, bridge.join("version.json")).map_err(|e| e.to_string())?;
     }
     std::fs::write(bridge.join("app-path.txt"), app_path.to_string_lossy().as_bytes()).map_err(|e| e.to_string())?;
@@ -149,15 +178,52 @@ pub fn configure_chrome_extension(app: tauri::AppHandle, extension_id: String) -
     let id = extension_id.trim();
     if !valid_id(id) { return Err("扩展 ID 必须是 32 位 a-p 小写字母，请从 Chrome 扩展管理页复制。".into()); }
     prepare_chrome_extension(app.clone())?;
+    #[cfg(windows)]
+    let directory = bridge_dir()?;
+    #[cfg(not(windows))]
     let directory = home()?.join("Library/Application Support/Google/Chrome/NativeMessagingHosts");
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let mut origins = Vec::<String>::new();
+    #[cfg(windows)]
+    if let Ok(bytes) = std::fs::read(directory.join("com.tdm.downloader.bridge.json")) {
+        if let Ok(previous) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+            if let Some(allowed) = previous["allowed_origins"].as_array() {
+                for origin in allowed.iter().filter_map(|value| value.as_str()) {
+                    if origin.strip_prefix("chrome-extension://").and_then(|id| id.strip_suffix('/')).is_some_and(valid_id) {
+                        origins.push(origin.to_owned());
+                    }
+                }
+            }
+        }
+    }
+    let origin = format!("chrome-extension://{id}/");
+    origins.retain(|value| value != &origin);
+    origins.push(origin);
     let manifest = serde_json::json!({
         "name": "com.tdm.downloader.bridge", "description": "TDM browser download connector",
-        "path": bridge_dir()?.join("tdm-browser-bridge"), "type": "stdio",
-        "allowed_origins": [format!("chrome-extension://{id}/")]
+        "path": bridge_dir()?.join(bridge_name()), "type": "stdio",
+        "allowed_origins": origins
     });
     std::fs::write(directory.join("com.tdm.downloader.bridge.json"), serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    register_windows_host(&directory.join("com.tdm.downloader.bridge.json"), &standalone_app()?)?;
     browser_extension_status(app)
+}
+
+#[cfg(windows)]
+fn register_windows_host(manifest: &Path, executable: &Path) -> Result<(), String> {
+    use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+    let user = RegKey::predef(HKEY_CURRENT_USER);
+    for browser in ["Google\\Chrome", "Microsoft\\Edge"] {
+        let (key, _) = user.create_subkey(format!("Software\\{browser}\\NativeMessagingHosts\\com.tdm.downloader.bridge"))
+            .map_err(|e| e.to_string())?;
+        key.set_value("", &manifest.to_string_lossy().as_ref()).map_err(|e| e.to_string())?;
+    }
+    let (scheme, _) = user.create_subkey("Software\\Classes\\tdm").map_err(|e| e.to_string())?;
+    scheme.set_value("", &"URL:TDM Downloader").map_err(|e| e.to_string())?;
+    scheme.set_value("URL Protocol", &"").map_err(|e| e.to_string())?;
+    let (command, _) = scheme.create_subkey("shell\\open\\command").map_err(|e| e.to_string())?;
+    command.set_value("", &format!("\"{}\" \"%1\"", executable.display())).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

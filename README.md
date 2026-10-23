@@ -1,171 +1,217 @@
 # TDM Downloader 软件介绍
 
-> 📘 **项目简介**：[查看项目简介](SOFTWARE_INTRO.md) — 功能、安装、上手、设置、FAQ
-> 📦 **版本发布列表**：[GitHub Releases](https://github.com/haoyuanwu/tdm-downloader/releases) — 下载各平台安装包、查看更新说明及历史版本
-> 📄 本文件是**技术向说明**：架构、IPC 接口、构建与测试
+一款适用于 macOS 和 Windows 的**多线程下载管理器**。安装包体积小，不用安装浏览器扩展即可使用。
 
-一个用 **Tauri 2 + Rust** 构建的多线程下载管理器。macOS 下载、构建和发布说明见 [MACOS.md](MACOS.md)。
+它的设计目标很单纯：**把大文件又快又稳地拉下来**——速度快、断了能续、限速可控、出问题自己重连。
 
-Windows 适配说明与两端功能差异见 [WINDOWS.md](WINDOWS.md)。
+**下载**：
 
-下载：[macOS Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_arm64.dmg) · [macOS Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_x86_64.dmg) · [Windows 安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe)
+- macOS v0.3.0 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_arm64.dmg)
+- macOS v0.3.0 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_x86_64.dmg)
+- Windows v0.2.2 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe)
+- [版本发布列表（GitHub Releases）](https://github.com/haoyuanwu/tdm-downloader/releases)：下载各平台安装包、查看更新说明及历史版本
 
-## 浏览器扩展
-
-Chrome 扩展与 macOS 连接器：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Browser-Extensions_0.3.0.zip)。Safari 扩展安装器随 macOS 应用提供。启用步骤见软件「设置 → 浏览器扩展」及 [扩展说明](browser-extension/README.md)。默认按 Shift + Command + D 打开助手弹窗。
-
-## 特性
-
-### 已实现（P0 核心）
-
-| 功能 | 说明 |
-|------|------|
-| **多线程分段下载** | 按 HTTP Range 切分为 N 段并行下载，默认 8 连接 |
-| **批量建任务** | 一次粘贴多个链接（每行一个或逗号分隔） |
-| **链接预解析** | 建任务前探测文件名 / 大小 / 是否支持 Range |
-| **断点续传** | 暂停后从分片实际长度继续，不重新下载 |
-| **自定义请求头** | 单任务可设 User-Agent / Referer / Cookie |
-| **代理模式** | 跟随系统 / 直连 / 自定义地址 |
-| **实时进度** | 已下载字节 / 总大小 / 百分比 / 瞬时速度 / 剩余时间 / 速度曲线 |
-| **任务管理** | 新建、暂停、恢复、失败重试、取消、删除、清空已完成、批量暂停/恢复、搜索 |
-| **限速** | 全局限速 + 单任务限速（时间窗口配额算法） |
-| **分片可视化** | 每个连接一条独立进度条 |
-| **剪贴板识别** | 自动检测复制的 http(s) 链接，一键下载 |
-| **系统托盘** | 菜单（显示 / 新建 / 暂停全部 / 恢复全部 / 退出）+ 关闭窗口最小化到托盘 |
-| **任务栏进度条** | 合计进度同步到 Windows 任务栏图标 |
-| **完成后动作** | 无 / 退出 / 关机 / 休眠 |
-| **设置持久化** | 目录、连接数、并发上限、限速、分段阈值、代理、文件冲突策略、主题、自启 |
-
-### 计划中（P1/P2）
-
-- 磁力/BT 下载
-- 视频站点下载（集成 yt-dlp / ffmpeg）
+> 仓库目前是私有的，链接需要登录 GitHub 账号后访问。
 
 ---
 
-## 快速开始
+## 一、它能做什么
 
-### 环境要求
+### 核心能力
 
-- Rust 1.99+（`rustup` 安装，MSVC 工具链）
-- Node.js 22+
-- WebView2 Runtime（Windows 10/11 通常已自带）
-- Visual Studio C++ 生成工具（用于 MSVC 链接）
+| 能力 | 说明 |
+|------|------|
+| **多线程分段下载** | 把一个文件按 HTTP Range 切成最多 32 段同时拉取，默认 8 连接 |
+| **断点续传** | 暂停、崩溃、断网后再打开，从已下载的位置继续，不重头再来 |
+| **批量下载** | 一次粘贴多个链接（每行一个），批量创建任务 |
+| **链接预解析** | 填完链接就显示文件名、大小和「能不能续传」，不用等下载开始才知道 |
+| **自定义请求头** | 可给单个任务设置 User-Agent / Referer / Cookie，对付需要鉴权的资源 |
+| **任务栏进度** | 总进度直接显示在 Windows 任务栏图标上，最小化也能看 |
+| **系统托盘** | 关闭窗口退到托盘继续下载，托盘菜单可一键暂停全部 / 恢复全部 |
+| **停滞自动重连** | 单个连接 20 秒没有数据就判定卡死，自动断开重连，指数退避重试（1→2→4→8→15 秒，最多 8 次） |
+| **智能识别限流** | 遇到服务器返回 429 / 503，自动拉长等待时间，不硬怼 |
+| **限速** | 支持全局限速（KB/s），也支持单个任务限速，0 表示不限 |
+| **实时进度** | 已下载 / 总大小 / 百分比 / 瞬时速度 / 剩余时间，每 500ms 刷新 |
+| **分片可视化** | 每个连接一条独立进度条，谁快谁慢一眼看得出 |
+| **剪贴板识别** | 复制一个 http(s) 链接，打开软件自动提示，一键开下 |
+| **自动跟随系统代理** | 直接读取 Windows 注册表的代理配置（含 PAC），不用手动填 |
+| **设置持久化** | 下载目录、连接数、并发数、限速、分段阈值全部自动保存 |
 
-### 开发模式
+### 任务管理
+
+新建、暂停、恢复、取消、删除、清空已完成——该有的都有。任务状态机清晰：`等待 → 连接中 → 下载中 → 合并中 → 已完成`，任意阶段可暂停或取消。
+
+---
+
+## 二、界面一览
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  TDM Downloader                            [设置] [最小化]│
+├─────────────────────────────────────────────────────────┤
+│  总速度 22.4 MB/s    进行中 2    已完成 15                │  ← 顶部统计
+├─────────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ model.gguf                          68%  22.4 MB/s│  │
+│  │ ████████████████████░░░░░░░░  4.6 GB / 6.77 GB    │  │  ← 任务卡片
+│  │ ├ 分片0 ████████░░  ███████░░░  ████████████      │  │  ← 分片进度
+│  │ 剩余 1分32秒            [暂停] [打开目录] [删除]   │  │
+│  └───────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────┤
+│                      [ + 新建下载 ]                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+深色界面，主色调青紫，窗口默认 1080×720，可自由缩放（最小 900×600）。
+
+---
+
+## 三、安装
+
+### macOS：DMG
+
+按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
+
+### Windows 方式 A：安装包（推荐）
+
+- 安装包：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe>
+- 全部历史版本：<https://github.com/haoyuanwu/tdm-downloader/releases>
+
+下载 `0.2.2_x64-setup.exe`，双击一路下一步。
+
+- 约 3 MB，安装到当前用户目录，**不需要管理员权限**
+- 自动创建开始菜单快捷方式和卸载入口
+- 安装界面为简体中文
+
+SHA256：`78a0790779b1ea73022ce2a9cdc742c3d660691509ddcc24f96d51608f309201`
+
+> 文件名就是版本号，便于一眼分辨；始终想拿最新版用 `latest_x64-setup.exe`。
+> 仓库目前是**私有**的，下载链接需要登录 GitHub 账号后才能访问。
+
+### Windows 方式 B：免安装版
+
+- 便携版：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe>
+
+下载 `0.2.2_x64_portable.exe`（约 15 MB），放到任意目录直接双击运行。适合放 U 盘随身带。
+
+SHA256：`406a7b25e229027391d269fea6c391d34c2cebf8b28f97e43841098d7d4f012a`
+
+### Windows 方式 C：从源码构建
+
+需要 Rust 1.99+、Node.js 22+、WebView2 Runtime、Visual Studio C++ 生成工具：
 
 ```bash
-cd tdm-downloader
 npm install
-npm run tauri dev
+npm run package        # 产物输出到 release/，文件名即版本号
 ```
 
-首次编译较慢（约 20-25 分钟，Tauri 依赖树很大），后续增量编译很快。
-
-### 生产打包
-
-```bash
-npm run tauri build
-```
-
-产物在 `src-tauri/target/release/bundle/nsis/`，为 NSIS 安装包。
-
-### 仅编译后端
-
-```bash
-cd src-tauri
-cargo build          # 产出 target/debug/tdm-downloader.exe
-cargo test           # 运行下载引擎测试
-```
+详细命令见 `COMMANDS.md`。
 
 ---
 
-## 项目结构
+## 四、快速上手
+
+1. 点 **「+ 新建下载」**（或直接在别处复制链接，软件会自动识别）
+2. 填入 URL——**可以一次粘贴多个**，每行一个；稍等片刻会显示文件名、大小和是否可续传
+3. 选择保存目录，设置连接数（默认 8，大文件建议 16）
+4. 需要鉴权的资源可展开「高级选项」填 UA / Referer / Cookie
+5. 点「开始下载」；也可以勾选「仅添加到列表」稍后手动开始
+
+下载过程中可以随时暂停——已经下载的部分不会丢，恢复时从断点继续。
+
+### 下载时产生的临时文件
 
 ```
-tdm-downloader/
-├── src/                        # React 18 + TypeScript 前端
-│   ├── main.tsx
-│   ├── App.tsx                 # 主界面（任务列表 / 统计 / 弹窗）
-│   ├── api.ts                  # Tauri IPC 封装 + 事件订阅
-│   ├── types.ts                # 与 Rust models.rs 对应的类型
-│   ├── styles.css
-│   └── components/
-│       ├── TaskCard.tsx        # 单个任务卡片（进度条 / 分片 / 操作）
-│       ├── NewDownloadDialog.tsx
-│       └── SettingsPanel.tsx
-├── src-tauri/                  # Rust 后端
-│   ├── Cargo.toml
-│   ├── build.rs
-│   ├── tauri.conf.json
-│   ├── capabilities/default.json
-│   ├── gen_icons.py            # 纯 stdlib 生成应用图标
-│   └── src/
-│       ├── main.rs
-│       ├── lib.rs              # 12 个 IPC 命令
-│       ├── models.rs           # 任务/状态/设置数据结构
-│       └── engine.rs           # 下载引擎（分段/续传/限速/合并）+ 集成测试
-├── REVERSE_ANALYSIS.md         # TDM Fast 逆向分析报告
-└── DEVELOPMENT_PLAN.md         # 开发规划
+<文件名>.part0 ... .partN      # 各连接的分片
+<文件名>.tdmstate.json         # 续传状态（URL、分片进度、总大小）
 ```
+
+任务完成后会自动合并成最终文件并清理临时文件。中途取消的话，这些文件会保留，下次点同一个链接可以接着下。
 
 ---
 
-## 后端 IPC 命令
+## 五、设置项说明
 
-| 命令 | 说明 |
-|------|------|
-| `start_download` | 新建下载任务（可带 UA / 自定义头 / start_paused） |
-| `probe_url` | 预解析链接：文件名、大小、是否支持 Range |
-| `list_tasks` | 列出所有任务 |
-| `pause_task` / `resume_task` / `cancel_task` | 暂停 / 恢复（含失败重试）/ 取消 |
-| `pause_all` / `resume_all` | 批量暂停 / 批量恢复 |
-| `remove_task` / `clear_completed` | 删除 / 清空已完成 |
-| `get_settings` / `save_settings` | 读写设置 |
-| `pick_directory` / `open_path` / `open_download_dir` | 文件系统交互 |
-| `set_progress_bar` | Windows 任务栏进度条（0.0–1.0，null 清除） |
-| `show_main_window` / `hide_main_window` / `quit_app` | 窗口与退出控制（托盘菜单用） |
-| `set_autostart` / `get_autostart` | 开机自启开关（写 Windows 启动目录） |
-| `get_app_info` | 版本与可执行文件路径 |
-| `copy_text` | 写入剪贴板 |
-
-### 前端订阅的事件
-
-- `download://progress` — 每 500ms 推送一次进度（速度、ETA、分片明细）
-- `download://tasks` — 任务列表变化
-- `tdm://new-task` — 托盘菜单点击「新建下载」
+| 设置项 | 默认值 | 说明 |
+|--------|--------|------|
+| 默认下载目录 | 系统下载文件夹 | 新建任务时的默认保存位置 |
+| 默认连接数 | 8 | 单任务分段数，范围 1–32 |
+| 最大并发任务数 | 3 | 同时进行的任务上限 |
+| 全局限速 | 0（不限） | 单位 KB/s，作用于所有任务总和 |
+| 分段阈值 | 1 MB | 文件小于此值就用单连接（小文件多线程反而更慢） |
+| 启用分段 | 开 | 关闭后强制单连接下载 |
+| 文件已存在时 | 自动重命名 | 可选自动重命名 / 覆盖原文件 / 跳过不下载 |
+| 代理 | 跟随系统 | 可选跟随系统 / 直连 / 自定义地址 |
+| 默认 User-Agent | 内置 UA | 单个任务可在「高级选项」里覆盖 |
+| 全部下载完成后 | 不执行操作 | 可选退出程序 / 关机（30 秒后）/ 休眠 |
+| 关闭窗口时 | 最小化到托盘 | 关掉则直接退出 |
+| 开机自动启动 | 关 | 写入 Windows 启动目录 |
+| 主题 | 深色 | 可选深色 / 浅色 |
 
 ---
 
-## 下载文件布局
+## 六、实测表现
 
-下载过程中会在目标目录产生临时文件，完成后自动清理：
+用 Hugging Face 上一个 **6.77 GB** 的模型文件做真实测试（16 连接）：
 
-```
-<文件名>.part0 ... .partN      # 各连接的下载分片
-<文件名>.tdmstate.json         # 断点续传状态（URL、分片进度、总大小）
-```
+- 稳态速度约 **22 MB/s**
+- 中途遭遇 CDN 只放行 3 个连接、其余 13 个挂起 8 分钟零进度——停滞重连机制介入后自动恢复，3 分钟内从 1635 MB 推进到 4999 MB
+- 全程未出现需要人工干预的中断
 
-任务完成后分片与状态文件会被合并进最终文件并删除。
-
----
-
-## 测试
-
-```bash
-cd src-tauri && cargo test
-```
-
-内置一个支持 Range 请求的极简 HTTP 服务器，真实跑通：
-
-1. `test_segmented_download_and_merge` — 8 线程分段下载 → 合并，逐字节比对源文件
-2. `test_resume_from_partial` — 模拟中断（分片 0 完成 40%、分片 1 完成 10%）后续传，校验完整性
-3. `test_helpers` — 分片切分连续性、文件名推断、非法字符清理
+正是这次实测暴露了两个真实缺陷并已修复：**代理读取**（此前误用环境变量代理导致连不上）和**连接假死**（现已加入超时重连）。
 
 ---
 
-## 已知限制
+## 七、系统要求
 
-- 分段下载要求服务端支持 `Accept-Ranges: bytes`；不支持时自动退化为单连接
-- 文件大小未知时（无 Content-Length）使用单连接流式下载
-- 尚未实现浏览器协议接管（P1）；托盘菜单已实现
+- macOS 12 或更高版本，Apple 芯片或 Intel 芯片
+- Windows 10 / 11，x64
+- WebView2 Runtime（Win10 21H2 以上和 Win11 通常已自带，缺失时会提示下载）
+
+---
+
+## 八、常见问题
+
+**Q：为什么有的文件只用 1 个连接？**
+服务端不支持 `Accept-Ranges: bytes`，或文件小于分段阈值（默认 1 MB）。任务卡片上会显示「不可续传」标记。这是正常的降级行为，不是 bug。
+
+**Q：文件大小显示未知？**
+服务器没返回 `Content-Length`，此时走单连接流式下载，进度条只显示已下载量。
+
+**Q：公司网络下连不上？**
+软件默认读取 Windows 系统代理设置。如果系统代理不可用，可在「设置 → 网络」里改成「直连」或填写自定义代理地址；也可以临时设置环境变量 `TDM_USE_ENV_PROXY=1` 改用环境变量代理。
+
+**Q：关掉窗口后下载还在跑吗？**
+在。默认关闭窗口只是最小化到托盘，任务栏图标上能看到总进度。想彻底退出，用托盘菜单里的「退出」，或在设置里关掉「关闭窗口时最小化到托盘」。
+
+**Q：能设置下载完自动关机吗？**
+可以。「设置 → 系统 → 全部下载完成后」选择「关机」，所有任务结束后会 30 秒后关机（留了取消时间）。只要还有任务在下载或暂停中就不会触发。
+
+**Q：杀毒软件报毒？**
+Tauri 打包的 Rust 程序偶发误报。可以下载源码自行编译，或用 `cargo build --release` 出包。
+
+---
+
+## 九、后续计划
+
+- 系统托盘菜单 + 任务栏进度条
+- 批量链接导入
+- 视频站点 / 磁力链接支持
+
+---
+
+## 十、关于
+
+- 代码结构、IPC 接口、测试说明见 [项目简介](SOFTWARE_INTRO.md)
+- 详细命令手册见 `COMMANDS.md`
+
+## 浏览器下载助手
+
+macOS v0.3.0 提供 Chrome 与 Safari 扩展接管：浏览器触发下载后唤起主窗口，延迟约 0.6 秒在主页面中央显示确认窗，点击「下载」后建立任务。
+
+- Safari：软件「设置 → 浏览器扩展 → Safari → 打开扩展安装器」，按教程启用「TDM 下载助手」并授权网站。临时签名版可能需要手动允许未签名扩展。
+- Chrome：[下载扩展与连接器](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Browser-Extensions_0.3.0.zip)，解压后按软件中的 Chrome 教程加载扩展、使用扩展 ID 安装本地连接器。推荐直接使用软件中的「一键准备插件」和「连接 Chrome」，无需自行编译；手动脚本安装需要 Xcode Command Line Tools 和 Python 3。
+- Chrome / Edge 在 Windows 按 **Ctrl + Shift + Y**、Mac 按 **Command + Shift + Y** 打开助手；Safari 使用 **Shift + Command + D**。也可以通过工具栏图标打开，快捷键冲突时按教程调整。
+- 仅支持普通 HTTP/HTTPS 文件；不支持 blob/data 链接，依赖登录态或特殊请求头的下载可能无法接管。Safari 部分脚本下载按钮无法自动识别，可尝试右键链接「使用 TDM 下载此链接」。
+
+Safari 发行包仍使用临时签名：部分 Safari（本机 Safari 27 已实测）即使允许未签名扩展，也可能不显示该扩展。本机测试应使用 Apple Development 签名构建；公开默认可用的 Safari 扩展仍需 Developer ID 发行签名与公证。更新 App 时会保留已经可用的证书签名扩展，不用临时签名副本覆盖。

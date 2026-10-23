@@ -39,8 +39,7 @@ pub fn browser_download_decision(app: tauri::AppHandle, request_id: String, acce
     let current = app.state::<super::QuickWindowState>();
     let mut state = current.0.lock().map_err(|e| e.to_string())?;
     if state.request_id.as_deref() != Some(&id) { return Err("下载请求已过期，请在浏览器重试".into()); }
-    let directory = std::env::var("HOME").map(std::path::PathBuf::from).map_err(|e| e.to_string())?
-        .join("Library/Caches/com.tdm.downloader.bridge");
+    let directory = super::browser_paths::decision_dir()?;
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     std::fs::write(directory.join(id), if accepted { "accepted" } else { "cancelled" }).map_err(|e| e.to_string())?;
     state.request_id = None;
