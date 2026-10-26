@@ -10,7 +10,6 @@ export function ChromeExtensionManager() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
-    if (isWindows) return;
     let active = true;
     void api.browserExtensionStatus().then((result) => {
       if (active) { setStatus(result); setExtensionId(result.chrome_extension_id || ""); }
@@ -32,7 +31,6 @@ export function ChromeExtensionManager() {
     finally { setBusy(false); }
   };
 
-  if (isWindows) return null;
   return <div className="browser-extension-manager" aria-label="Chrome 插件版本与配置">
     <strong>插件与 App 分开升级</strong>
     <p className="hint">App 更新会自动同步连接目标；插件版本不变时，保留插件文件与扩展 ID，无需重新配置。此处检查的是当前 App 附带的版本。</p>
@@ -46,10 +44,10 @@ export function ChromeExtensionManager() {
     </div>
     {status?.chrome_installed_version && <>
       <p className="hint extension-directory">固定目录：{status.chrome_directory}</p>
-      <label className="extension-id-label" htmlFor="chrome-extension-id">Chrome 扩展 ID</label>
+      <label className="extension-id-label" htmlFor="chrome-extension-id">{isWindows ? "Chrome / Edge 扩展 ID" : "Chrome 扩展 ID"}</label>
       <div className="extension-manager-actions">
-        <input id="chrome-extension-id" value={extensionId} onChange={(event) => setExtensionId(event.target.value)} placeholder="从 Chrome 扩展管理页复制 32 位 ID" autoCapitalize="none" spellCheck={false} disabled={busy} />
-        <button type="button" className="btn" disabled={busy || !/^[a-p]{32}$/.test(extensionId.trim())} onClick={() => void run(true)}>连接 Chrome</button>
+        <input id="chrome-extension-id" value={extensionId} onChange={(event) => setExtensionId(event.target.value)} placeholder="从扩展管理页复制 32 位 ID" autoCapitalize="none" spellCheck={false} disabled={busy} />
+        <button type="button" className="btn" disabled={busy || !/^[a-p]{32}$/.test(extensionId.trim())} onClick={() => void run(true)}>{isWindows ? "连接浏览器" : "连接 Chrome"}</button>
       </div>
       <p className="hint">首次从旧文件夹迁移到此固定目录时，请以 Chrome 新显示的 ID 为准。首次加载和更新后的重新加载仍需在 Chrome 中完成。</p>
     </>}

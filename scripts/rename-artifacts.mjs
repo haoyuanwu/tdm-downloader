@@ -15,6 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -89,6 +90,29 @@ copyAs(setupSrc, `latest_${arch}-setup.exe`);
 if (fs.existsSync(portableSrc)) {
   copyAs(portableSrc, `${base}_${arch}_portable.exe`);
   copyAs(portableSrc, `latest_${arch}_portable.exe`);
+  // Browser integration needs adjacent resource files, so also provide a complete portable ZIP.
+  if (process.platform === "win32") {
+    const browserResources = path.join(root, "src-tauri/target/release/browser");
+    if (!fs.existsSync(path.join(browserResources, "tdm-browser-bridge.exe"))) {
+      throw new Error("缺少 Windows 浏览器连接器，无法生成完整免安装包");
+    }
+    const staging = fs.mkdtempSync(path.join(outDir, ".portable-"));
+    const executable = path.join(staging, "tdm-downloader.exe");
+    const resources = path.join(staging, "browser");
+    const archive = path.join(staging, "portable.zip");
+    fs.copyFileSync(portableSrc, executable);
+    fs.cpSync(browserResources, resources, { recursive: true });
+    execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+      "Compress-Archive -LiteralPath $env:TDM_PORTABLE_EXE, $env:TDM_PORTABLE_RESOURCES -DestinationPath $env:TDM_PORTABLE_ZIP -Force"],
+      { windowsHide: true, env: { ...process.env, TDM_PORTABLE_EXE: executable, TDM_PORTABLE_RESOURCES: resources, TDM_PORTABLE_ZIP: archive } });
+    copyAs(archive, `${base}_${arch}_portable.zip`);
+    copyAs(archive, `latest_${arch}_portable.zip`);
+    // Clean only the fresh staging directory created inside this release directory.
+    if (path.dirname(staging) !== outDir || !path.basename(staging).startsWith(".portable-")) {
+      throw new Error("免安装包临时目录不在预期发布目录内");
+    }
+    fs.rmSync(staging, { recursive: true });
+  }
 } else {
   console.warn(`[rename-artifacts] 跳过便携版（未找到 ${portableSrc}）`);
 }

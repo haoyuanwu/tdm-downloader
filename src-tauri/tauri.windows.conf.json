@@ -1,6 +1,15 @@
 {
+  "build": {
+    "beforeDevCommand": "node scripts/build-browser-windows.mjs && npm run dev",
+    "beforeBuildCommand": "node scripts/build-browser-windows.mjs && npm run build"
+  },
   "bundle": {
     "targets": ["nsis"],
-    "icon": ["icons/icon.ico"]
+    "icon": ["icons/icon.ico"],
+    "resources": {
+      "../browser-extension/chrome/": "browser/chrome/",
+      "../release/browser-native-windows/tdm-browser-bridge.exe": "browser/tdm-browser-bridge.exe",
+      "../browser-extension/native/windows-version.json": "browser/native-version.json"
+    }
   }
 }

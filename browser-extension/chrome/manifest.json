@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TDM 下载助手",
   "description": "将浏览器文件下载交给 TDM，确认后开始下载。",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "permissions": [
     "downloads",
     "nativeMessaging",
@@ -14,13 +14,13 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "TDM 下载助手（Shift + Command + D）"
+    "default_title": "TDM 下载助手"
   },
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Ctrl+Shift+D",
-        "mac": "Command+Shift+D"
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
       },
       "description": "打开 TDM 下载助手"
     }

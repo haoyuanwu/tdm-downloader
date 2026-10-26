@@ -1,1 +1,9 @@
 :root { color-scheme: light dark; font-family: -apple-system, sans-serif; } body { width: 285px; margin: 0; padding: 20px; } h1 { font-size: 17px; margin: 0 0 12px; } p { font-size: 12px; line-height: 1.7; color: light-dark(#536175,#a6b5cb); } label { display:flex; align-items:center; gap:8px; padding:12px 0; font-size:13px; } input { accent-color:#2864d7; } #status { border-top:1px solid #80808040; padding-top:12px; }
+section { border: 1px solid #80808040; border-radius: 8px; padding: 12px; }
+#shortcut-help { margin: 0 0 8px; }
+#shortcut-help.shortcut-warning, #shortcut-error { color: light-dark(#994000, #ffbf80); }
+#shortcut-settings { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid currentColor; border-radius: 6px; background: transparent; color: light-dark(#2458ae, #a6c8ff); font: inherit; font-size: 13px; cursor: pointer; }
+#shortcut-settings:hover { background: light-dark(#eaf1ff, #243247); }
+#shortcut-settings:focus-visible { outline: 2px solid light-dark(#2458ae, #a6c8ff); outline-offset: 3px; }
+.shortcut-hint { margin-bottom: 0; }
+#shortcut-error:empty { display: none; }

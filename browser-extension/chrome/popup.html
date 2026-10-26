@@ -1,1 +1,20 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>TDM 下载助手</title><link rel="stylesheet" href="popup.css"><body><h1>TDM 下载助手</h1><p>触发下载时唤起 TDM，确认后接管。</p><p>打开助手：macOS 按 <kbd>⇧⌘D</kbd>（Shift + Command + D），Windows / Linux 按 <kbd>Ctrl + Shift + D</kbd>。在此开启或关闭自动接管。</p><label><input id="enabled" type="checkbox">自动接管下载</label><p id="status" role="status"></p><p>首次使用需安装本地连接器。接管失败时浏览器继续下载。</p><script src="popup.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>TDM 下载助手</title>
+<link rel="stylesheet" href="popup.css">
+<body>
+  <h1>TDM 下载助手</h1>
+  <p>触发下载时唤起 TDM，确认后接管。</p>
+  <section aria-label="打开助手快捷键">
+    <p id="shortcut-help" role="status">正在读取快捷键…</p>
+    <button id="shortcut-settings" type="button" aria-describedby="shortcut-help">查看快捷键设置</button>
+    <p class="shortcut-hint">在设置中找到「TDM 下载助手 → 激活此扩展程序」修改。</p>
+    <p id="shortcut-error" role="alert"></p>
+  </section>
+  <label><input id="enabled" type="checkbox">自动接管下载</label>
+  <p id="status" role="status"></p>
+  <p>首次使用需安装本地连接器。接管失败时浏览器继续下载。</p>
+  <script src="popup.js"></script>
+</body>
+</html>

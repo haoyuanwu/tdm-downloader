@@ -4,6 +4,7 @@
 
 mod clipboard;
 mod browser_bridge;
+mod browser_paths;
 mod browser_dialog;
 mod task_files;
 mod safari_extension;
@@ -514,7 +515,14 @@ async fn copy_text(app: tauri::AppHandle, text: String) -> Result<(), String> {
 pub fn run() {
     let engine = Arc::new(DownloadEngine::new());
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(windows)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _| {
+        if !receive_windows_browser_args(app, &args) {
+            let _ = show_main_window(app.clone());
+        }
+    }));
+    builder
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 let label = webview.label().to_string();
@@ -606,6 +614,8 @@ pub fn run() {
             tauri::async_runtime::spawn(clipboard::monitor(app.handle().clone()));
             tauri::async_runtime::spawn(tray_progress::monitor(app.handle().clone()));
             tauri::async_runtime::spawn(notifications::initialize(app.handle().clone()));
+            #[cfg(windows)]
+            receive_windows_browser_args(app.handle(), &std::env::args().collect::<Vec<_>>());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -669,6 +679,20 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(windows)]
+fn receive_windows_browser_args(app: &tauri::AppHandle, args: &[String]) -> bool {
+    let mut received = false;
+    for arg in args.iter().skip(1) {
+        if let Ok(url) = url::Url::parse(arg) {
+            if url.scheme() == "tdm" || (cfg!(debug_assertions) && url.scheme() == "tdm-dev") {
+                browser_bridge::receive(app, &url);
+                received = true;
+            }
+        }
+    }
+    received
 }
 
 /// 构建系统托盘图标与菜单

@@ -17,6 +17,23 @@ Chrome 的 `manifest.json`、Safari 的 `manifest.json`、连接器的 `native/v
 
 ## Chrome 安装
 
+### Windows Chrome / Edge
+
+使用包含本次 Windows 适配的正式构建，在“设置 → 浏览器扩展”点击“一键准备插件”，再打开插件文件夹。Chrome 在 `chrome://extensions`、Edge 在 `edge://extensions` 开启开发者模式，加载该文件夹；将扩展显示的 ID 填回 TDM 并连接。两个浏览器 ID 不同时分别配置一次，已连接的 ID 会保留。浏览器首次加载、启用及更新后的重新加载仍由用户操作。
+
+插件位于 `%LOCALAPPDATA%/TDM Browser Extensions/chrome`，Windows EXE 连接器及配置位于 `%LOCALAPPDATA%/TDM Browser Bridge`。Native Messaging 注册仅写入当前用户的 Chrome / Edge 注册表项，不需要管理员权限。`tdm://` 也注册到当前用户，浏览器连接器按配置的程序绝对路径启动，并通过单实例转发给已运行的 TDM。
+
+Windows 连接器版本由 `native/windows-version.json` 和 `native-windows/Cargo.toml` 维护，独立于 Mac Swift 连接器。使用普通安装版或构建后的程序配置，不能将连接器配置到依赖开发服务器的 debug 程序。程序移动后打开一次可同步路径；程序关闭时不会启动开发服务器。
+
+源码构建运行 `npm run package`，自动编译并附带 Windows 连接器；单独准备资源可运行 `node scripts/build-browser-windows.mjs`。直接运行 `cargo test` 前也需先准备该资源。Windows 连接器回归测试：
+
+```sh
+cargo test --manifest-path browser-extension/native-windows/Cargo.toml
+node --test browser-extension/native-windows/integration.test.cjs
+```
+
+### macOS 手动安装
+
 1. 先运行当前开发版 `npm run tauri dev`，或安装之后包含本功能的正式版（v0.2.6 及以前尚不支持）。
 2. 打开 `chrome://extensions`，开启开发者模式，点击“加载已解压的扩展程序”，选择本目录的 `chrome` 文件夹。
 3. 复制显示的 32 位扩展 ID，在项目根目录执行：
@@ -60,8 +77,9 @@ cd src-tauri && cargo test --lib browser_bridge
 ## 打开插件与快捷键
 
 - Safari：先在 Safari 设置 → 扩展中启用「TDM 下载助手」并允许网站访问。在浏览器内按 **Shift + Command + D（⇧⌘D）**，或点击工具栏 TDM 图标打开助手弹窗，打开「自动接管下载」开关。
-- Chrome：先启用扩展并安装本地连接器，按 **Shift + Command + D** 打开助手（Windows/Linux 为 Ctrl + Shift + D），或从工具栏拼图菜单打开并固定「TDM 下载助手」。
+- Chrome / Edge：先启用扩展并安装本地连接器，按 **Command + Shift + Y** 打开助手（Windows/Linux 为 **Ctrl + Shift + Y**），或从工具栏拼图菜单打开并固定「TDM 下载助手」。Chrome 扩展从 0.1.2 起使用这组原生快捷键；已有安装可能保留旧键位，请在浏览器扩展快捷键页面修改「激活此扩展程序」。
 - 快捷键只打开助手弹窗，不会绕过浏览器首次启用步骤。Chrome 旧版快捷键或冲突可在 `chrome://extensions/shortcuts` 中调整「激活此扩展程序」。
+- Chrome / Edge 扩展 0.1.3 在 Windows、macOS 弹窗中显示「TDM 下载助手 · 打开助手」的实际键位。未分配时标注可能被占用或已清除，点击「快捷键不可用 · 点击前往设置」进入当前浏览器快捷键设置，再找到「TDM 下载助手 → 激活此扩展程序」修改。读取失败不会误报冲突；浏览器不提供其他软件占用者信息。
 - 扩展 0.1.1 修复 Safari 右键菜单中文编码并重建缓存菜单；更新后重新载入扩展或重启 Safari，再刷新网页。
 
 ## Safari 删除后的重新安装与同名副本
