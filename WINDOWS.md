@@ -1,6 +1,6 @@
 # Windows 适配与 macOS 功能对照
 
-已拉取远程 `main` 的 v0.3.0 源码（`92d7efb`），本轮主要补齐 Mac 新增的浏览器下载功能。本次 Windows 改动尚未发布；已发布的 Windows v0.2.4 不包含本轮新增功能。
+v0.3.1 与 macOS 同步发布下载记录持久化、文件存在状态、状态栏列表交互及 Windows 浏览器集成。GitHub Release 发布后自动构建并上传 Windows x64 安装包和完整免安装 ZIP。
 
 ## 两端已共用的功能
 
@@ -77,3 +77,8 @@ Windows 使用 `npm run tauri build` 构建安装包；`npm run package` 额外�
 ## 状态栏任务列表交互
 
 任务列表与 macOS 共用组件，点击或按 Enter / 空格定位本地文件，Windows 显示「资源管理器」，macOS 显示「Finder」。列表支持悬停、选中、操作中和结果反馈，右键菜单提供打开、定位、另存为与删除确认。后续此处功能变更需同步考虑两端。Windows 原生对话框与资源管理器操作仍需在 Windows 机器验收。
+## 下载记录持久化与文件状态
+
+Windows 的下载历史保存于 `%LOCALAPPDATA%\tdm-downloader\tasks.json`（无 LOCALAPPDATA 时使用 APPDATA）；macOS 对应 `~/Library/Application Support/tdm-downloader/tasks.json`。记录采用临时文件加原子替换保存，移除任务后不会在重启时恢复。未完成任务重启后保持暂停。
+
+两端主列表与状态栏列表均检查已完成文件是否存在，缺失时保留记录并标注原因，禁用打开 / 另存为，单击状态栏任务或目录按钮可查看原目录。每 3 秒检查一次，文件恢复到原路径后自动更新。未完成任务没有最终文件属于正常情况，不显示“文件缺失”。

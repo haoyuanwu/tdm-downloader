@@ -188,6 +188,9 @@ pub struct DownloadTask {
     /// 服务端是否支持断点续传（Accept-Ranges）
     #[serde(default)]
     pub resumable: bool,
+    /// 完成文件的实时检查结果；None 表示尚未完成或暂时无法检查。
+    #[serde(default)]
+    pub file_exists: Option<bool>,
 }
 
 impl DownloadTask {

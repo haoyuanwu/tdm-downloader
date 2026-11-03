@@ -99,6 +99,7 @@ async fn start_download(
     if should_clear {
         clear_clipboard_candidate(&app);
     }
+    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(task)
@@ -109,6 +110,7 @@ async fn start_download(
 async fn list_tasks(
     state: tauri::State<'_, Arc<DownloadEngine>>,
 ) -> Result<Vec<DownloadTask>, String> {
+    state.check_history_loaded()?;
     Ok(state.snapshot().await)
 }
 
@@ -121,6 +123,7 @@ async fn pause_task(
 ) -> Result<(), String> {
     let engine = Arc::clone(&state);
     engine::pause_task(&engine, &id).await?;
+    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -135,6 +138,7 @@ async fn resume_task(
 ) -> Result<(), String> {
     let engine = Arc::clone(&state);
     engine::resume_task(app.clone(), engine.clone(), &id).await?;
+    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -149,6 +153,7 @@ async fn cancel_task(
 ) -> Result<(), String> {
     let engine = Arc::clone(&state);
     engine::cancel_task(&engine, &id).await?;
+    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -164,6 +169,7 @@ async fn remove_task(
 ) -> Result<(), String> {
     let engine = Arc::clone(&state);
     engine::remove_task(&engine, &id, delete_file.unwrap_or(false)).await?;
+    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -186,6 +192,7 @@ async fn clear_completed(
     for id in ids {
         let _ = engine::remove_task(&engine, &id, false).await;
     }
+    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -588,6 +595,7 @@ pub fn run() {
             notifications::open_notification_settings,
         ])
         .setup(|app| {
+            tauri::async_runtime::spawn(engine::monitor_history(app.handle().clone(), app.state::<Arc<DownloadEngine>>().inner().clone()));
             extension_manager::refresh_app_path();
             safari_extension::refresh_registered_copy();
             tauri::WebviewWindowBuilder::new(

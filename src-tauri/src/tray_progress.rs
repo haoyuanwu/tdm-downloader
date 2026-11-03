@@ -51,7 +51,7 @@ pub async fn monitor(app: tauri::AppHandle) {
     let mut interval = tokio::time::interval(Duration::from_millis(500));
     loop {
         interval.tick().await;
-        let tasks = engine.snapshot().await;
+        let tasks = engine.snapshot_unchecked().await;
         app.state::<TrayProgressState>().has_tasks.store(
             tasks
                 .iter()

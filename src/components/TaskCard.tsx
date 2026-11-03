@@ -43,6 +43,7 @@ export function TaskCard({
   onOpen,
   onOpenDir,
 }: Props) {
+  const missing = task.status === "completed" && task.file_exists === false;
   const total = task.total_size || 0;
   const pct = task.status === "completed" ? 100 : total > 0 ? Math.max(0, Math.min((task.downloaded / total) * 100, 100)) : 0;
   const isActive =
@@ -81,7 +82,7 @@ export function TaskCard({
   };
 
   return (
-    <article className={`task-card status-${task.status}`}>
+    <article className={`task-card status-${task.status}${missing ? " file-missing" : ""}`}>
       <div className="task-top">
         <div className="file-type"><Icon name="file" size={24} /><span>{task.filename.split(".").length > 1 ? task.filename.split(".").pop()!.slice(0, 5).toUpperCase() : "FILE"}</span></div>
         <div className="task-identity">
@@ -91,8 +92,8 @@ export function TaskCard({
 
         {isActive && <Sparkline data={history} />}
 
-        <span className={`badge badge-${task.status}`}>
-          {STATUS_LABEL[task.status]}
+        <span className={`badge ${missing ? "badge-missing" : `badge-${task.status}`}`}>
+          {missing ? "文件缺失" : STATUS_LABEL[task.status]}
         </span>
 
         {!task.resumable && isActive && (
@@ -124,8 +125,8 @@ export function TaskCard({
             </Tooltip>
           )}
           {isDone && (
-            <Tooltip text="打开文件">
-              <button className="btn btn-icon" onClick={() => onOpen(task)}>
+            <Tooltip text={missing ? "文件已被移动或删除" : "打开文件"}>
+              <button className="btn btn-icon" disabled={missing} onClick={() => onOpen(task)}>
                 <Icon name="external" size={17} />
               </button>
             </Tooltip>
@@ -184,6 +185,7 @@ export function TaskCard({
           {isActive && <span>剩余 {formatEta(eta ? Math.round(eta) : null)}</span>}
         </div>
 
+        {missing && <div className="file-missing-note"><Icon name="alert" size={15} />文件已被移动或删除，下载记录已保留。可打开原目录查看。</div>}
         {task.error && <div className="error-text" role="alert"><Icon name="alert" size={15} />{task.error}</div>}
       </div>
     </article>

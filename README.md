@@ -6,9 +6,9 @@
 
 **下载**：
 
-- macOS v0.3.0 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_arm64.dmg)
-- macOS v0.3.0 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_x86_64.dmg)
-- Windows v0.2.2 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe)
+- macOS v0.3.1 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_arm64.dmg)
+- macOS v0.3.1 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_x86_64.dmg)
+- Windows v0.3.1 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_x64_portable.zip)
 - [版本发布列表（GitHub Releases）](https://github.com/haoyuanwu/tdm-downloader/releases)：下载各平台安装包、查看更新说明及历史版本
 
 > 仓库目前是私有的，链接需要登录 GitHub 账号后访问。
@@ -70,11 +70,11 @@
 
 ### macOS：DMG
 
-按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Downloader_0.3.0_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
+按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
 
 ### Windows 方式 A：安装包（推荐）
 
-- 安装包：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64-setup.exe>
+- 安装包：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_x64-setup.exe>
 - 全部历史版本：<https://github.com/haoyuanwu/tdm-downloader/releases>
 
 下载 `0.2.2_x64-setup.exe`，双击一路下一步。
@@ -90,7 +90,7 @@ SHA256：`78a0790779b1ea73022ce2a9cdc742c3d660691509ddcc24f96d51608f309201`
 
 ### Windows 方式 B：免安装版
 
-- 便携版：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.2.2/0.2.2_x64_portable.exe>
+- 便携版：<https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_x64_portable.zip>
 
 下载 `0.2.2_x64_portable.exe`（约 15 MB），放到任意目录直接双击运行。适合放 U 盘随身带。
 
@@ -207,10 +207,10 @@ Tauri 打包的 Rust 程序偶发误报。可以下载源码自行编译，或�
 
 ## 浏览器下载助手
 
-macOS v0.3.0 提供 Chrome 与 Safari 扩展接管：浏览器触发下载后唤起主窗口，延迟约 0.6 秒在主页面中央显示确认窗，点击「下载」后建立任务。
+macOS v0.3.1 提供 Chrome 与 Safari 扩展接管：浏览器触发下载后唤起主窗口，延迟约 0.6 秒在主页面中央显示确认窗，点击「下载」后建立任务。
 
 - Safari：软件「设置 → 浏览器扩展 → Safari → 打开扩展安装器」，按教程启用「TDM 下载助手」并授权网站。临时签名版可能需要手动允许未签名扩展。
-- Chrome：[下载扩展与连接器](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.0/TDM-Browser-Extensions_0.3.0.zip)，解压后按软件中的 Chrome 教程加载扩展、使用扩展 ID 安装本地连接器。推荐直接使用软件中的「一键准备插件」和「连接 Chrome」，无需自行编译；手动脚本安装需要 Xcode Command Line Tools 和 Python 3。
+- Chrome：[下载扩展与连接器](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Browser-Extensions_0.3.1.zip)，解压后按软件中的 Chrome 教程加载扩展、使用扩展 ID 安装本地连接器。推荐直接使用软件中的「一键准备插件」和「连接 Chrome」，无需自行编译；手动脚本安装需要 Xcode Command Line Tools 和 Python 3。
 - Chrome / Edge 在 Windows 按 **Ctrl + Shift + Y**、Mac 按 **Command + Shift + Y** 打开助手；Safari 使用 **Shift + Command + D**。也可以通过工具栏图标打开，快捷键冲突时按教程调整。
 - 仅支持普通 HTTP/HTTPS 文件；不支持 blob/data 链接，依赖登录态或特殊请求头的下载可能无法接管。Safari 部分脚本下载按钮无法自动识别，可尝试右键链接「使用 TDM 下载此链接」。
 

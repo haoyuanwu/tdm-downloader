@@ -1009,3 +1009,9 @@ h1 > span { display: inline-flex; vertical-align: middle; padding: 3px 8px; marg
 .quick-status-dot.status-failed { background:var(--danger); }
 .quick-status-dot.status-paused { background:var(--warn); }
 @media (prefers-reduced-motion:reduce) { .quick-task[role="button"], .quick-task-affordance { transition:none; } }
+.badge-missing { color: var(--warn); background: var(--bg-hover); }
+.task-card.file-missing .file-type { color: var(--warn); }
+.file-missing-note { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--warn); font-size: 12px; line-height: 1.5; }
+.quick-task.file-missing .quick-task-track > div { background: var(--warn); }
+.quick-status-dot.status-missing { background: var(--warn); }
+.quick-file-warning { display: flex; align-items: center; gap: 5px; color: var(--warn); font-size: 12px; line-height: 1.5; margin-top: 5px; }

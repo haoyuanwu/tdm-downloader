@@ -386,31 +386,62 @@ pub struct DownloadEngine {
     pub settings: Arc<Mutex<Settings>>,
     /// 全局并发任务数限制
     pub slots: Arc<Semaphore>,
+    history: Mutex<Option<Vec<u8>>>,
+    history_path: PathBuf,
+    history_load_error: Option<String>,
 }
 
 impl DownloadEngine {
     pub fn new() -> Self {
+        Self::with_history_path(settings_file().with_file_name("tasks.json"))
+    }
+
+    fn with_history_path(history_path: PathBuf) -> Self {
         let client = build_http_client();
         let settings = load_settings().unwrap_or_default();
         let max = settings.max_concurrent.max(1);
+        let (tasks, history_load_error) = match load_history(&history_path) {
+            Ok(tasks) => (tasks, None),
+            Err(error) => (HashMap::new(), Some(error)),
+        };
         DownloadEngine {
             client,
-            tasks: Arc::new(Mutex::new(HashMap::new())),
+            tasks: Arc::new(Mutex::new(tasks)),
             settings: Arc::new(Mutex::new(settings)),
             slots: Arc::new(Semaphore::new(max)),
+            history: Mutex::new(None),
+            history_path,
+            history_load_error,
         }
     }
 
-    /// 生成任务快照列表
-    pub async fn snapshot(&self) -> Vec<DownloadTask> {
+    /// 内存快照供频繁刷新进度及持久化使用，避免扫描历史文件。
+    pub async fn snapshot_unchecked(&self) -> Vec<DownloadTask> {
         let map = self.tasks.lock().await;
         let mut out = Vec::with_capacity(map.len());
         for h in map.values() {
             let mut t = h.task.lock().await.clone();
-            t.downloaded = t.segments.iter().map(|s| s.downloaded).sum();
+            if t.status != TaskStatus::Completed {
+                t.downloaded = t.segments.iter().map(|s| s.downloaded).sum();
+            }
             out.push(t);
         }
         out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        out
+    }
+
+    /// 面向列表的快照同时检查完成文件。
+    pub async fn snapshot(&self) -> Vec<DownloadTask> {
+        let mut out = self.snapshot_unchecked().await;
+        for task in &mut out {
+            task.file_exists = if task.status == TaskStatus::Completed {
+                match tokio::fs::metadata(&task.save_path).await {
+                    Ok(metadata) => Some(metadata.is_file()),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(false),
+                    Err(_) => None,
+                }
+            } else { None };
+        }
         out
     }
 
@@ -419,8 +450,79 @@ impl DownloadEngine {
         let map = self.tasks.lock().await;
         let h = map.get(id)?;
         let mut t = h.task.lock().await.clone();
-        t.downloaded = t.segments.iter().map(|s| s.downloaded).sum();
+        if t.status != TaskStatus::Completed {
+            t.downloaded = t.segments.iter().map(|s| s.downloaded).sum();
+        }
         Some(t)
+    }
+
+    pub fn check_history_loaded(&self) -> Result<(), String> {
+        self.history_load_error.as_ref().map_or(Ok(()), |error| Err(error.clone()))
+    }
+
+    /// 串行生成和原子替换快照，避免旧快照覆盖新任务或中途退出损坏文件。
+    pub async fn persist_history(&self) -> Result<(), String> {
+        self.check_history_loaded()?;
+        let mut previous = self.history.lock().await;
+        let mut tasks = self.snapshot_unchecked().await;
+        // 文件状态只供 UI 使用，每次运行重新检查。
+        for task in &mut tasks { task.file_exists = None; }
+        tasks.sort_by(|a, b| a.id.cmp(&b.id));
+        let data = serde_json::to_vec(&tasks).map_err(|error| error.to_string())?;
+        if previous.as_ref() == Some(&data) { return Ok(()); }
+        let path = self.history_path.clone();
+        let bytes = data.clone();
+        tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+            let dir = path.parent().ok_or_else(|| std::io::Error::other("任务存储路径无效"))?;
+            fs::create_dir_all(dir)?;
+            let mut temp = tempfile::NamedTempFile::new_in(dir)?;
+            temp.write_all(&bytes)?;
+            temp.as_file().sync_all()?;
+            temp.persist(path).map_err(|error| error.error)?;
+            Ok(())
+        }).await.map_err(|error| error.to_string())?
+            .map_err(|error| format!("保存下载列表失败：{error}"))?;
+        *previous = Some(data);
+        Ok(())
+    }
+}
+
+fn load_history(path: &Path) -> Result<HashMap<String, TaskHandle>, String> {
+    let data = match fs::read(path) {
+        Ok(data) => data,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(HashMap::new()),
+        Err(error) => return Err(format!("读取下载列表失败，已停止覆盖原记录：{error}")),
+    };
+    let tasks: Vec<DownloadTask> = match serde_json::from_slice(&data) {
+        Ok(tasks) => tasks,
+        Err(error) => {
+            // 保留异常文件便于恢复，不让下一次保存覆盖唯一副本。
+            let backup = path.with_file_name(format!("tasks.invalid-{}.json", uuid::Uuid::new_v4()));
+            if let Err(copy_error) = fs::copy(path, backup) {
+                return Err(format!("下载记录损坏且无法备份，已停止覆盖原记录：{error}；{copy_error}"));
+            }
+            eprintln!("下载记录无法读取，已保留备份：{error}");
+            return Ok(HashMap::new());
+        }
+    };
+    Ok(tasks.into_iter().map(|mut task| {
+        if task.status.is_active() || task.status == TaskStatus::Pending {
+            task.status = TaskStatus::Paused;
+        }
+        task.file_exists = None;
+        (task.id.clone(), TaskHandle::new(task))
+    }).collect())
+}
+
+/// 检查外部移动/删除和恢复的文件，同时为运行中的任务定期保存进度。
+pub async fn monitor_history(app: tauri::AppHandle, engine: Arc<DownloadEngine>) {
+    let mut last = Vec::new();
+    loop {
+        if let Err(error) = engine.persist_history().await { eprintln!("{error}"); }
+        let list = engine.snapshot().await;
+        let state = serde_json::to_vec(&list).unwrap_or_default();
+        if state != last { let _ = app.emit(EVT_TASKS, &list); last = state; }
+        tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
 
@@ -1272,6 +1374,7 @@ pub async fn run_task(app: tauri::AppHandle, engine: Arc<DownloadEngine>, handle
 /// 推送单个任务更新 + 任务列表更新
 async fn notify(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>, task: DownloadTask) {
     let _ = app.emit(format!("download://task/{}", task.id).as_str(), &task);
+    if let Err(error) = engine.persist_history().await { eprintln!("{error}"); }
     let list = engine.snapshot().await;
     let _ = app.emit(EVT_TASKS, list);
     // 只在实际下载并合并成功后通知；文件已存在而跳过的任务不提醒。
@@ -1381,6 +1484,7 @@ pub async fn spawn_task(
     engine: Arc<DownloadEngine>,
     req: NewTaskRequest,
 ) -> Result<DownloadTask, String> {
+    engine.check_history_loaded()?;
     let settings = engine.settings.lock().await;
     let dir = if req.dir.is_empty() {
         settings.download_dir.clone()
@@ -1424,6 +1528,7 @@ pub async fn spawn_task(
         user_agent: req.user_agent.clone().unwrap_or_default(),
         headers: req.headers.clone().unwrap_or_default(),
         resumable: false,
+        file_exists: None,
     };
 
     let handle = TaskHandle::new(task.clone());
@@ -1510,6 +1615,7 @@ pub async fn pause_all(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>) {
     for id in ids {
         let _ = pause_task(engine, &id).await;
     }
+    if let Err(error) = engine.persist_history().await { eprintln!("{error}"); }
     let list = engine.snapshot().await;
     let _ = app.emit(EVT_TASKS, list);
 }
@@ -1526,6 +1632,7 @@ pub async fn resume_all(app: &tauri::AppHandle, engine: &Arc<DownloadEngine>) {
     for id in ids {
         let _ = resume_task(app.clone(), Arc::clone(engine), &id).await;
     }
+    if let Err(error) = engine.persist_history().await { eprintln!("{error}"); }
     let list = engine.snapshot().await;
     let _ = app.emit(EVT_TASKS, list);
 }
@@ -1604,6 +1711,67 @@ mod tests {
     use std::io::Read;
     use std::net::TcpListener;
 
+    #[tokio::test]
+    async fn history_survives_restart_detects_missing_files_and_retains_removal() {
+        let dir = std::env::temp_dir().join(format!("tdm_history_{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("tasks.json");
+        let file = dir.join("finished.bin");
+        fs::write(&file, b"complete").unwrap();
+        let engine = DownloadEngine::with_history_path(path.clone());
+        let mut complete = make_task("done", "https://example.com/file", &file.to_string_lossy(), 8, 1);
+        complete.status = TaskStatus::Completed;
+        complete.downloaded = 8;
+        complete.segments.clear(); // 跳过已存在文件的任务也必须保留完成字节数。
+        complete.finished_at = Some(42);
+        let mut active = make_task("active", "https://example.com/part", &dir.join("part.bin").to_string_lossy(), 20, 1);
+        active.status = TaskStatus::Downloading;
+        active.segments[0].downloaded = 7;
+        active.headers.push(("Referer".into(), "https://example.com".into()));
+        engine.tasks.lock().await.insert("done".into(), TaskHandle::new(complete));
+        engine.tasks.lock().await.insert("active".into(), TaskHandle::new(active));
+        engine.persist_history().await.unwrap();
+        drop(engine);
+        let restored = Arc::new(DownloadEngine::with_history_path(path.clone()));
+        let list = restored.snapshot().await;
+        let done = list.iter().find(|task| task.id == "done").unwrap();
+        assert_eq!(done.status, TaskStatus::Completed);
+        assert_eq!(done.downloaded, 8);
+        assert_eq!(done.finished_at, Some(42));
+        assert_eq!(done.file_exists, Some(true));
+        let active = list.iter().find(|task| task.id == "active").unwrap();
+        assert_eq!(active.status, TaskStatus::Paused);
+        assert_eq!(active.downloaded, 7);
+        assert_eq!(active.headers.len(), 1);
+        assert_eq!(active.file_exists, None); // 没有最终文件的未完成任务不能误报缺失。
+        fs::remove_file(&file).unwrap();
+        assert_eq!(restored.snapshot().await.iter().find(|task| task.id == "done").unwrap().file_exists, Some(false));
+        fs::write(&file, b"restored").unwrap();
+        assert_eq!(restored.snapshot().await.iter().find(|task| task.id == "done").unwrap().file_exists, Some(true));
+        remove_task(&restored, "done", false).await.unwrap();
+        restored.persist_history().await.unwrap();
+        assert!(file.exists());
+        let restarted = DownloadEngine::with_history_path(path);
+        assert_eq!(restarted.snapshot().await.len(), 1);
+        assert!(restarted.get("done").await.is_none());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn corrupt_history_is_backed_up_before_replacing() {
+        let dir = std::env::temp_dir().join(format!("tdm_history_bad_{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("tasks.json");
+        fs::write(&path, b"interrupted json").unwrap();
+        let engine = DownloadEngine::with_history_path(path.clone());
+        engine.persist_history().await.unwrap();
+        let backup = fs::read_dir(&dir).unwrap().filter_map(Result::ok)
+            .find(|entry| entry.file_name().to_string_lossy().starts_with("tasks.invalid-")).unwrap();
+        assert_eq!(fs::read(backup.path()).unwrap(), b"interrupted json");
+        assert_eq!(fs::read_to_string(path).unwrap(), "[]");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn old_settings_still_require_confirmation_and_keep_local_files() {
         let old: Settings = serde_json::from_str(r#"{"theme":"light","connections":12}"#).unwrap();
@@ -1627,7 +1795,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("tdm_remove_keep_{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
         let save = dir.join("keep.bin").to_string_lossy().into_owned();
-        let engine = Arc::new(DownloadEngine::new());
+        let engine = Arc::new(DownloadEngine::with_history_path(dir.join("tasks.json")));
         let mut task = make_task("keep", "https://example.com/keep", &save, 20, 1);
         task.status = TaskStatus::Downloading;
         let handle = TaskHandle::new(task);
@@ -1653,7 +1821,7 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let save = dir.join(format!("tdm-delete-test-{}.txt", uuid::Uuid::new_v4()));
         fs::write(&save, b"temporary test file").unwrap();
-        let engine = Arc::new(DownloadEngine::new());
+        let engine = Arc::new(DownloadEngine::with_history_path(dir.join("tasks.json")));
         let mut task = make_task(
             "completed",
             "https://example.com/file",
@@ -1766,6 +1934,7 @@ mod tests {
             user_agent: String::new(),
             headers: Vec::new(),
             resumable: false,
+        file_exists: None,
         }
     }
 

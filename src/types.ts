@@ -40,6 +40,8 @@ export interface DownloadTask {
   user_agent: string;
   headers: [string, string][];
   resumable: boolean;
+  /** 完成文件的实时存在状态；null 表示未完成或暂时无法检查。 */
+  file_exists: boolean | null;
 }
 
 export interface ProgressEvent {

@@ -221,7 +221,7 @@ export default function App() {
 
   const openDir = useCallback(async (task: DownloadTask) => {
     try {
-      await api.openDownloadDir(task.save_path);
+      await api.revealTaskFile(task.id);
     } catch (e) {
       console.error(e);
     }

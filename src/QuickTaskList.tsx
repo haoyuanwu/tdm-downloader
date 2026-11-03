@@ -62,7 +62,7 @@ export default function QuickTaskList() {
       } else if (name === "open") { await api.openPath(task.save_path); setNotice(`已请求打开：${task.filename}`); }
       else if (name === "reveal") {
         await api.revealTaskFile(task.id);
-        setNotice(`已在${isWindows ? "资源管理器" : " Finder "}中定位：${task.filename}`);
+        setNotice(`${task.file_exists === false ? "文件已不存在，已打开原目录：" : `已在${isWindows ? "资源管理器" : " Finder "}中定位：`}${task.filename}`);
       }
       else {
         const path = await api.saveTaskAs(task.id);
@@ -99,6 +99,7 @@ export default function QuickTaskList() {
   const visible = tasks.filter((task) => task.status !== "cancelled")
     .sort((a, b) => Number(running(b)) - Number(running(a)) || b.created_at - a.created_at);
   const count = visible.filter(running).length;
+  const menuTask = menu ? tasks.find((task) => task.id === menu.task.id) : undefined;
 
   return (
     <main className="quick-panel quick-downloads" onKeyDown={(event) => { if ((remove || menu) && event.key === "Escape") event.stopPropagation(); }}>
@@ -116,12 +117,14 @@ export default function QuickTaskList() {
         {loading && <p className="quick-empty" role="status">正在读取下载任务…</p>}
         {!loading && !error && !visible.length && <p className="quick-empty">还没有下载任务</p>}
         {visible.map((task) => {
+          const missing = task.status === "completed" && task.file_exists === false;
+          const label = missing ? "文件缺失" : STATUS_LABEL[task.status];
           const known = task.total_size > 0 && task.total_size < Number.MAX_SAFE_INTEGER;
           const percent = task.status === "completed" ? 100 : known ? Math.min(100, Math.max(0, task.downloaded / task.total_size * 100)) : undefined;
           const speed = task.status === "downloading" ? (speeds[task.id] ? formatSpeed(speeds[task.id]) : "0 B/s") : "—";
           return (
-            <article key={task.id} className={`quick-task quick-task-${task.status}${selected === task.id ? " is-selected" : ""}${operating === task.id ? " is-working" : ""}`} tabIndex={0} role="button"
-              aria-label={`${task.filename}，${STATUS_LABEL[task.status]}，点击打开所在目录，右键更多操作`}
+            <article key={task.id} className={`quick-task quick-task-${task.status}${missing ? " file-missing" : ""}${selected === task.id ? " is-selected" : ""}${operating === task.id ? " is-working" : ""}`} tabIndex={0} role="button"
+              aria-label={`${task.filename}，${label}，点击打开所在目录，右键更多操作`}
               aria-busy={operating === task.id} aria-disabled={operating !== null || busy}
               title={`${task.save_path}\n点击打开所在目录 · 右键更多操作`}
               onClick={() => { if (!busy) void action(task, "reveal"); }}
@@ -140,15 +143,16 @@ export default function QuickTaskList() {
                 <div style={{ width: `${percent ?? 0}%` }} />
               </div>
               <div className="quick-task-meta">
-                <span title={task.error || undefined}><i className={`quick-status-dot status-${task.status}`} aria-hidden="true" />{STATUS_LABEL[task.status]} · {formatBytes(task.downloaded)}{known ? ` / ${formatBytes(task.total_size)}` : ""}</span>
+                <span title={task.error || undefined}><i className={`quick-status-dot status-${missing ? "missing" : task.status}`} aria-hidden="true" />{label} · {formatBytes(task.downloaded)}{known ? ` / ${formatBytes(task.total_size)}` : ""}</span>
                 <span>{speed}</span>
               </div>
+              {missing && <div className="quick-file-warning"><Icon name="alert" size={12} />已被移动或删除 · 点击查看原目录</div>}
               <div className="quick-task-affordance" aria-hidden="true"><Icon name="folder" size={12} /><span>{operating === task.id ? "正在处理…" : "打开所在目录"}</span><Icon name="arrow" size={12} /></div>
             </article>
           );
         })}
       </div>
-      {menu && <div ref={menuRef} role="menu" aria-label="下载任务操作" className="quick-task-menu" style={{ left: menu.x, top: menu.y }}
+      {menu && menuTask && <div ref={menuRef} role="menu" aria-label="下载任务操作" className="quick-task-menu" style={{ left: menu.x, top: menu.y }}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === "Escape") { event.preventDefault(); setMenu(null); }
@@ -158,10 +162,10 @@ export default function QuickTaskList() {
             items[event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (current + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length]?.focus();
           }
         }}>
-        <button role="menuitem" disabled={menu.task.status !== "completed"} onClick={() => void action(menu.task, "open")}>打开</button>
-        <button role="menuitem" onClick={() => void action(menu.task, "reveal")}>{isWindows ? "在资源管理器中显示" : "在 Finder 中显示"}</button>
-        <button role="menuitem" disabled={menu.task.status !== "completed"} onClick={() => void action(menu.task, "save")}>另存为…</button>
-        <button role="menuitem" className="is-danger" onClick={() => void action(menu.task, "remove")}>删除…</button>
+        <button role="menuitem" disabled={menuTask.status !== "completed" || menuTask.file_exists === false} onClick={() => void action(menuTask, "open")}>打开</button>
+        <button role="menuitem" onClick={() => void action(menuTask, "reveal")}>{isWindows ? "在资源管理器中显示" : "在 Finder 中显示"}</button>
+        <button role="menuitem" disabled={menuTask.status !== "completed" || menuTask.file_exists === false} onClick={() => void action(menuTask, "save")}>另存为…</button>
+        <button role="menuitem" className="is-danger" onClick={() => void action(menuTask, "remove")}>删除…</button>
       </div>}
       {remove && <div className="quick-remove-dialog"><RemoveTaskDialog tasks={[remove]} initialDeleteFiles={deleteFiles} busy={busy} error={error}
         onClose={() => { if (!busy) { setRemove(null); setError(""); void api.quickTaskInteraction(false); } }}
