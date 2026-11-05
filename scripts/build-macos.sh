@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# 本地打包：默认当前 Mac 架构，传入 all 同时构建两个架构。
+# 本地打包：仅构建 Apple 芯片 arm64 版本。
 set -euo pipefail
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root_dir"
 
 if [[ "$(uname -s)" != Darwin ]]; then echo "此脚本只能在 macOS 上运行" >&2; exit 1; fi
-architecture="${1:-$(uname -m)}"
+architecture="${1:-arm64}"
 case "$architecture" in
   arm64) targets=(aarch64-apple-darwin); labels=(arm64) ;;
-  x86_64) targets=(x86_64-apple-darwin); labels=(x86_64) ;;
-  all) targets=(aarch64-apple-darwin x86_64-apple-darwin); labels=(arm64 x86_64) ;;
-  *) echo "用法：npm run package:macos [-- arm64|x86_64|all]" >&2; exit 1 ;;
+  *) echo "仅支持 Apple 芯片 arm64；用法：npm run package:macos [-- arm64]" >&2; exit 1 ;;
 esac
 [[ $# -le 1 ]] || { echo "参数过多" >&2; exit 1; }
 for command_name in node npm rustup xcodebuild xcrun codesign hdiutil lipo ditto shasum; do

@@ -7,7 +7,6 @@
 **下载**：
 
 - macOS v0.3.1 · Apple 芯片（arm64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_arm64.dmg)
-- macOS v0.3.1 · Intel 芯片（x86_64）：[下载 DMG](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_x86_64.dmg)
 - Windows v0.3.1 · x64：[下载安装包](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_x64-setup.exe) / [下载免安装版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_x64_portable.zip)
 - [版本发布列表（GitHub Releases）](https://github.com/haoyuanwu/tdm-downloader/releases)：下载各平台安装包、查看更新说明及历史版本
 
@@ -70,7 +69,7 @@
 
 ### macOS：DMG
 
-按 Mac 芯片选择 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_arm64.dmg) 或 [Intel 版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_x86_64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
+下载 [Apple 芯片版](https://github.com/haoyuanwu/tdm-downloader/releases/download/v0.3.1/TDM-Downloader_0.3.1_macos_arm64.dmg)。打开 DMG，把 TDM Downloader 拖到“应用程序”文件夹并替换旧版。应用使用临时签名，尚未经过 Developer ID 发行签名和 Apple 公证，首次打开可能需要在系统设置的“隐私与安全性”中允许运行。
 
 ### Windows 方式 A：安装包（推荐）
 
@@ -164,7 +163,7 @@ npm run package        # 产物输出到 release/，文件名即版本号
 
 ## 七、系统要求
 
-- macOS 12 或更高版本，Apple 芯片或 Intel 芯片
+- macOS 12 或更高版本，Apple 芯片（后续版本仅发布 arm64）
 - Windows 10 / 11，x64
 - WebView2 Runtime（Win10 21H2 以上和 Win11 通常已自带，缺失时会提示下载）
 

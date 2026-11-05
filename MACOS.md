@@ -2,19 +2,19 @@
 
 这是原项目的 macOS 构建，沿用相同的 Rust 分段下载引擎和 React 界面。支持批量建任务、链接预解析、HTTP Range 多连接下载、暂停与续传、限速、任务管理、剪贴板链接检测、菜单栏图标和下载完成后的动作。
 
+后续 macOS 版本仅构建和发布 Apple 芯片 arm64 安装包。
+
 ## 构建
 
 需要 macOS 12+、完整 Xcode、Rust 1.99+ 和 Node.js 22+。
 
 ### 本地打包安装（推荐）
 
-双击项目根目录的 **打包macOS.command** 即可打包当前 Mac 架构。也可以在项目目录执行：
+双击项目根目录的 **打包macOS.command** 即可打包 Apple 芯片 arm64 版本。也可以在项目目录执行：
 
 ```sh
-npm run package:macos                 # 当前 Mac 架构
+npm run package:macos                 # Apple 芯片 arm64
 npm run package:macos -- arm64        # Apple 芯片
-npm run package:macos -- x86_64       # Intel
-npm run package:macos -- all          # 两种架构
 ```
 
 首次需要完整 Xcode（用于构建 Safari 扩展）、Rust 与 Node.js；脚本会在缺少 Node 依赖时执行 npm ci，安装对应 Rust 目标，再构建界面、Safari 扩展与 Chrome 连接器。无需 GitHub 登录、提交记录或干净工作区。
@@ -33,9 +33,9 @@ npm run package:macos -- all          # 两种架构
 npm run release:macos
 ```
 
-脚本一次性构建共享的前端、Safari 扩展与通用架构 Chrome 连接器，再分别构建 arm64 和 x86_64 的已签名应用，通过 `hdiutil create` 在后台生成 DMG。整个发布流程不调用 Finder / AppleScript，不打开安装窗口、不运行安装器。DMG 中保留应用与「Applications」目录快捷方式，可正常拖入安装。
+脚本一次性构建共享的前端、arm64 Safari 扩展与 Chrome 连接器，再构建 arm64 的已签名应用，通过 `hdiutil create` 在后台生成 DMG。整个发布流程不调用 Finder / AppleScript，不打开安装窗口、不运行安装器。DMG 中保留应用与「Applications」目录快捷方式，可正常拖入安装。
 
-每个 DMG 只执行一次必要校验：映像完整性、只读隐藏挂载后的实际版本与架构、完整应用签名和内置 Safari 扩展。随后计算 SHA256，从更新日志提取中文说明，推送 `main` 与标签，并上传两个 DMG 和 Chrome 扩展压缩包。文件保存在 `release/`，同一版本已正式发布时需更新版本号。
+每个 DMG 只执行一次必要校验：映像完整性、只读隐藏挂载后的实际版本与架构、完整应用签名和内置 Safari 扩展。随后计算 SHA256，从更新日志提取中文说明，推送 `main` 与标签，并上传 arm64 DMG 和 Chrome 扩展压缩包。文件保存在 `release/`，同一版本已正式发布时需更新版本号。
 
 如果构建已完成但上传中断，确认源码未变后可运行 `npm run release:macos -- --reuse-existing`，复用并再次校验已生成的 DMG。
 

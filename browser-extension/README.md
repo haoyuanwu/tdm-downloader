@@ -9,7 +9,7 @@
 
 ## App 内一键配置与独立版本
 
-新版入口：设置 → 浏览器扩展 → Google Chrome。点击「一键准备插件」后打开固定文件夹，在 Chrome 中加载一次，再填写扩展 ID 并点击「连接 Chrome」。App 内配置使用随包附带的通用架构连接器，不需要 Xcode 或 Python。下方终端脚本保留给手动配置场景。
+新版入口：设置 → 浏览器扩展 → Google Chrome。点击「一键准备插件」后打开固定文件夹，在 Chrome 中加载一次，再填写扩展 ID 并点击「连接 Chrome」。App 内配置使用随包附带的 arm64 连接器，不需要 Xcode 或 Python。下方终端脚本保留给手动配置场景。
 
 Chrome 文件固定保存在 `~/Library/Application Support/TDM Browser Extensions/chrome`，连接器及 ID 注册文件使用固定路径。App 覆盖更新会同步连接目标，插件版本相同则不改写文件；更新文件后仍需在 Chrome 中重新加载。首次从旧文件夹迁移时需要使用新文件夹显示的扩展 ID。
 
@@ -55,7 +55,7 @@ node --test browser-extension/native-windows/integration.test.cjs
 bash scripts/build-safari-extension.sh
 ```
 
-输出在 `release/safari/TDM Safari Connector.app`，包含 arm64 和 x86_64 两种架构。macOS 打包时会自动执行此脚本并把容器放入 TDM 应用资源中；开发版使用上述本地输出。
+输出在 `release/safari/TDM Safari Connector.app`，仅包含 arm64 架构。macOS 打包时会自动执行此脚本并把容器放入 TDM 应用资源中；开发版使用上述本地输出。
 
 应用内入口：**设置 → 浏览器扩展 → 打开扩展安装器**，该页提供启用、网站授权、临时签名与故障排查教程。
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 在 macOS 上构建 arm64 / x86_64 DMG，并发布到 GitHub Releases。
+# 在 macOS 上构建 arm64 DMG，并发布到 GitHub Releases。
 # 使用前先以中文提交所有改动；脚本要求工作区干净，避免发布未提交的源码。
 set -euo pipefail
 
@@ -63,7 +63,7 @@ if gh release view "$tag" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx 
   exit 1
 fi
 
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
+rustup target add aarch64-apple-darwin
 mkdir -p release
 
 build_prepared=false
@@ -90,7 +90,7 @@ build_dmg() {
   prepare_build
   echo "正在构建 $label ($target)……"
   # 只生成已签名的 .app；跳过 Tauri 会操作 Finder 的 DMG 美化流程。
-  # 前端与 Safari 资源已经准备好，两个架构不再重复执行 beforeBuildCommand。
+  # 前端与 Safari 资源已经准备好，不再重复执行 beforeBuildCommand。
   npm run tauri -- build --target "$target" --bundles app --ci \
     --config '{"build":{"beforeBuildCommand":""}}'
   bash scripts/package-macos-dmg.sh "$app_dir" "$output_dmg"
@@ -100,10 +100,8 @@ build_dmg() {
 }
 
 build_dmg aarch64-apple-darwin arm64
-build_dmg x86_64-apple-darwin x86_64
 
 arm_dmg="release/TDM-Downloader_${version}_macos_arm64.dmg"
-x86_dmg="release/TDM-Downloader_${version}_macos_x86_64.dmg"
 extension_zip="release/TDM-Browser-Extensions_${version}.zip"
 extension_stage="$(mktemp -d)"
 mkdir -p "$extension_stage/browser-extension" "$extension_stage/scripts"
@@ -114,7 +112,6 @@ cp scripts/install-chrome-bridge.sh "$extension_stage/scripts/"
 ditto -c -k --norsrc --noextattr "$extension_stage" "$extension_zip"
 rm -rf "$extension_stage"
 arm_sha="$(shasum -a 256 "$arm_dmg" | awk '{print $1}')"
-x86_sha="$(shasum -a 256 "$x86_dmg" | awk '{print $1}')"
 extension_sha="$(shasum -a 256 "$extension_zip" | awk '{print $1}')"
 notes_file="$(mktemp)"
 trap 'rm -f "$notes_file"' EXIT
@@ -126,7 +123,6 @@ $release_changes
 | 文件 | 适用 Mac | SHA256 |
 | --- | --- | --- |
 | $(basename "$arm_dmg") | Apple 芯片 (arm64) | $arm_sha |
-| $(basename "$x86_dmg") | Intel (x86_64) | $x86_sha |
 | $(basename "$extension_zip") | Chrome 扩展与 macOS 本地连接器 | $extension_sha |
 
 Safari 扩展安装器随 DMG 内的应用提供，入口：设置 → 浏览器扩展。Chrome 请解压扩展压缩包，按应用教程加载 browser-extension/chrome，并使用 scripts/install-chrome-bridge.sh 安装连接器（需要 Xcode Command Line Tools 和 Python 3）。Chrome / Edge 在 Mac 默认按 Command + Shift + Y、Windows 按 Ctrl + Shift + Y 打开助手弹窗；Safari 使用 Shift + Command + D，扩展需手动启用；临时签名在 Safari 27 中可能不被列出，即使已允许未签名扩展。本机测试需要 Apple Development 签名，公开默认可用仍需 Developer ID 发行签名及公证。已安装的可用证书签名扩展会保留。
@@ -138,15 +134,15 @@ EOF
 
 git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main
 if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-  git tag -a "$tag" -m "发布 TDM Downloader $version macOS 双架构版本"
+  git tag -a "$tag" -m "发布 TDM Downloader $version macOS arm64 版本"
 fi
 git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin "$tag"
 
 if gh release view "$tag" >/dev/null 2>&1; then
-  gh release upload "$tag" "$arm_dmg" "$x86_dmg" "$extension_zip" --clobber
+  gh release upload "$tag" "$arm_dmg" "$extension_zip" --clobber
   gh release edit "$tag" --notes-file "$notes_file" --draft=false
 else
-  gh release create "$tag" "$arm_dmg" "$x86_dmg" "$extension_zip" --draft --title "$tag" --notes-file "$notes_file"
+  gh release create "$tag" "$arm_dmg" "$extension_zip" --draft --title "$tag" --notes-file "$notes_file"
   gh release edit "$tag" --draft=false
 fi
 
