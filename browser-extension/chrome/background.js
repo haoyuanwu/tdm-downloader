@@ -23,7 +23,11 @@ chrome.downloads.onCreated.addListener(async (item) => {
     // 保留原任务，只有 TDM 成功创建任务并返回确认后才取消，失败或取消则续传。
     await chrome.downloads.pause(item.id); paused = true;
     await state("等待 TDM 确认，取消或超时后由浏览器继续下载");
-    const result = await send(item.finalUrl || item.url, item.filename.split(/[\\/]/).pop());
+    const [current] = await chrome.downloads.search({ id: item.id }).catch(() => []);
+    const filename = [current?.filename, item.filename]
+      .map((path) => path?.split(/[\\/]/).pop())
+      .find((name) => name && !name.toLowerCase().endsWith(".crdownload"));
+    const result = await send(current?.finalUrl || item.finalUrl || item.url, filename);
     if (result.status === "accepted") {
       await chrome.downloads.cancel(item.id); paused = false;
       await state("已交给 TDM 下载");

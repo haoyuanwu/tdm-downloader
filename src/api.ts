@@ -47,6 +47,7 @@ export const api = {
   saveTaskAs: (id: string) => invoke<string | null>("save_task_as", { id }),
   quickTaskInteraction: (active: boolean) => invoke<void>("quick_task_interaction", { active }),
   browserDialogContext: () => invoke<{ id: number; payload: QuickOpenContext } | null>("browser_dialog_context"),
+  browserDialogFilename: (id: number) => invoke<string>("browser_dialog_filename", { id }),
   finishBrowserDialog: (id: number, accepted: boolean) => invoke<void>("finish_browser_dialog", { id, accepted }),
   quickWindowReady: () => invoke<void>("quick_window_ready"),
   browserDecision: (requestId: string, accepted: boolean) => invoke<void>("browser_download_decision", { requestId, accepted }),

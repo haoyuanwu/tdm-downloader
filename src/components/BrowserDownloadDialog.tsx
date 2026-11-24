@@ -10,7 +10,16 @@ interface Context { id: number; payload: QuickOpenContext }
 function Confirmation({ context, onDone }: { context: Context; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [filename, setFilename] = useState<string | null>(null);
   const created = useRef(false);
+  useEffect(() => {
+    let active = true;
+    void api.browserDialogFilename(context.id).then(
+      (name) => { if (active) setFilename(name); },
+      () => { if (active) setFilename(context.payload.filename || "下载文件"); },
+    );
+    return () => { active = false; };
+  }, [context]);
   const close = async () => {
     if (busy) return;
     try { await api.finishBrowserDialog(context.id, created.current); onDone(); }
@@ -18,11 +27,11 @@ function Confirmation({ context, onDone }: { context: Context; onDone: () => voi
   };
   const dialog = useDialog(() => { void close(); }, busy);
   const download = async () => {
-    if (busy) return;
+    if (busy || !filename) return;
     setBusy(true); setError("");
     try {
       if (!created.current) {
-        await api.startDownload({ url: context.payload.url!, dir: "", filename: context.payload.filename || undefined });
+        await api.startDownload({ url: context.payload.url!, dir: "", filename });
         created.current = true;
       }
       await api.finishBrowserDialog(context.id, true);
@@ -30,26 +39,28 @@ function Confirmation({ context, onDone }: { context: Context; onDone: () => voi
     } catch (reason) { setError(String(reason)); }
     finally { setBusy(false); }
   };
+  const suffix = filename?.match(/.(\.(?:tar\.)?[a-z\d]{1,16})$/i)?.[1] ?? "";
   return <div className="modal-overlay browser-download-overlay">
     <div ref={dialog} className="modal browser-download-dialog" role="dialog" aria-modal="true" aria-labelledby="browser-download-title">
       <div className="settings-header">
         <div><h2 id="browser-download-title">浏览器下载</h2><p className="dialog-subtitle">确认后将此文件加入下载任务</p></div>
         <button className="btn settings-close" aria-label="关闭下载确认" disabled={busy} onClick={() => void close()}><Icon name="close" size={18} /></button>
       </div>
-      <div className="browser-download-file"><Icon name="download" size={24} /><strong>{context.payload.filename || decodeFilename(context.payload.url!)}</strong></div>
+      <div className="browser-download-file">
+        <Icon name="download" size={24} />
+        <strong title={filename ?? undefined} aria-live="polite">
+          <span>{filename ? filename.slice(0, filename.length - suffix.length) : "正在识别文件名…"}</span>
+          {suffix && <span>{suffix}</span>}
+        </strong>
+      </div>
       <p className="browser-download-url">{context.payload.url}</p>
       {error && <p className="error-text" role="alert">{error}</p>}
       <div className="modal-footer">
         <button className="btn" disabled={busy} onClick={() => void close()}>暂不下载</button>
-        <button className="btn btn-primary" data-initial-focus disabled={busy} onClick={() => void download()}>{busy ? "正在添加…" : created.current ? "完成交接" : "下载"}</button>
+        <button className="btn btn-primary" data-initial-focus disabled={busy} aria-disabled={!filename} onClick={() => void download()}>{busy ? "正在添加…" : created.current ? "完成交接" : "下载"}</button>
       </div>
     </div>
   </div>;
-}
-
-function decodeFilename(value: string) {
-  try { return decodeURIComponent(new URL(value).pathname.split("/").pop() || "下载文件"); }
-  catch { return "下载文件"; }
 }
 
 export function BrowserDownloadDialog() {

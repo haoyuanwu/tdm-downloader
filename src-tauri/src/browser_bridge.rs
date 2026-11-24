@@ -16,9 +16,7 @@ fn parse(url: &Url) -> Result<super::QuickOpenPayload, String> {
     }
     let request_id = params.get("request").map(|id| Uuid::parse_str(id).map(|id| id.to_string()))
         .transpose().map_err(|_| "请求标识无效")?;
-    let filename = params.get("filename").filter(|name| !name.is_empty()).map(|name| {
-        name.rsplit(['/', '\\']).next().unwrap_or("下载文件").chars().filter(|c| !c.is_control()).take(240).collect()
-    });
+    let filename = params.get("filename").and_then(|name| super::browser_dialog::clean_filename(name));
     Ok(super::QuickOpenPayload { mode: "browser".into(), url: Some(target.into()), filename, request_id })
 }
 

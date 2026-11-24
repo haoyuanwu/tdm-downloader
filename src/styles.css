@@ -974,7 +974,11 @@ h1 > span { display: inline-flex; vertical-align: middle; padding: 3px 8px; marg
 
 .browser-download-dialog { width:480px; max-width:calc(100vw - 48px); }
 .browser-download-file { display:flex; align-items:center; gap:12px; margin:24px 0 12px; }
-.browser-download-file strong { min-width:0; overflow-wrap:anywhere; }
+.browser-download-file > svg { flex-shrink:0; }
+.browser-download-file strong { display:flex; min-width:0; white-space:nowrap; }
+.browser-download-file strong span:first-child { overflow:hidden; text-overflow:ellipsis; }
+.browser-download-file strong span + span { flex-shrink:0; }
+.browser-download-dialog .btn[aria-disabled="true"] { opacity:.55; cursor:default; }
 .browser-download-url { padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--bg); font-size:12px; line-height:1.7; overflow-wrap:anywhere; user-select:text; max-height:140px; overflow:auto; }
 
 .browser-download-overlay { z-index:2000; }

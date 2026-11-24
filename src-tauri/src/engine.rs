@@ -607,13 +607,12 @@ pub fn sanitize_filename(name: &str) -> String {
 }
 
 /// 从 Content-Disposition 头解析文件名
-fn filename_from_cd(header: &str) -> Option<String> {
+pub(crate) fn filename_from_cd(header: &str) -> Option<String> {
     // 优先 filename*=UTF-8''xxx
     if let Some(idx) = header.find("filename*=") {
         let rest = &header[idx + 10..];
         let rest = rest.split(';').next().unwrap_or(rest).trim();
-        if let Some(pos) = rest.find("''") {
-            let val = &rest[pos + 2..];
+        if let Some(val) = rest.splitn(3, '\'').nth(2) {
             let val = val.trim_matches('\'').trim_matches('"');
             let dec = percent_decode(val);
             if !dec.is_empty() {

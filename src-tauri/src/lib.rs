@@ -584,6 +584,7 @@ pub fn run() {
             hide_quick_window,
             browser_bridge::browser_download_decision,
             browser_dialog::browser_dialog_context,
+            browser_dialog::browser_dialog_filename,
             browser_dialog::finish_browser_dialog,
             safari_extension::open_safari_connector,
             extension_manager::browser_extension_status,
