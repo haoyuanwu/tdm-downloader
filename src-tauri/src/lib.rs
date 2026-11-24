@@ -10,6 +10,7 @@ mod task_files;
 mod safari_extension;
 mod extension_manager;
 pub mod engine;
+mod history;
 pub mod models;
 mod notifications;
 mod popup_position;
@@ -29,6 +30,9 @@ struct ClipboardState(std::sync::Mutex<Option<clipboard::ClipboardCandidate>>);
 
 #[derive(Default)]
 struct BrowserWakeState(std::sync::atomic::AtomicBool);
+
+#[derive(Default)]
+struct HistoryExitState(std::sync::atomic::AtomicU8);
 
 #[derive(Clone, serde::Serialize, Default)]
 struct QuickOpenPayload {
@@ -99,7 +103,6 @@ async fn start_download(
     if should_clear {
         clear_clipboard_candidate(&app);
     }
-    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(task)
@@ -110,7 +113,7 @@ async fn start_download(
 async fn list_tasks(
     state: tauri::State<'_, Arc<DownloadEngine>>,
 ) -> Result<Vec<DownloadTask>, String> {
-    state.check_history_loaded()?;
+    state.check_history_loaded().await?;
     Ok(state.snapshot().await)
 }
 
@@ -138,7 +141,6 @@ async fn resume_task(
 ) -> Result<(), String> {
     let engine = Arc::clone(&state);
     engine::resume_task(app.clone(), engine.clone(), &id).await?;
-    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -153,7 +155,6 @@ async fn cancel_task(
 ) -> Result<(), String> {
     let engine = Arc::clone(&state);
     engine::cancel_task(&engine, &id).await?;
-    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -169,7 +170,6 @@ async fn remove_task(
 ) -> Result<(), String> {
     let engine = Arc::clone(&state);
     engine::remove_task(&engine, &id, delete_file.unwrap_or(false)).await?;
-    engine.persist_history().await?;
     let list = engine.snapshot().await;
     let _ = app.emit(engine::EVT_TASKS, list);
     Ok(())
@@ -595,7 +595,7 @@ pub fn run() {
             notifications::open_notification_settings,
         ])
         .setup(|app| {
-            tauri::async_runtime::spawn(engine::monitor_history(app.handle().clone(), app.state::<Arc<DownloadEngine>>().inner().clone()));
+            app.manage(HistoryExitState::default());
             extension_manager::refresh_app_path();
             safari_extension::refresh_registered_copy();
             tauri::WebviewWindowBuilder::new(
@@ -622,6 +622,7 @@ pub fn run() {
             tauri::async_runtime::spawn(clipboard::monitor(app.handle().clone()));
             tauri::async_runtime::spawn(tray_progress::monitor(app.handle().clone()));
             tauri::async_runtime::spawn(notifications::initialize(app.handle().clone()));
+            tauri::async_runtime::spawn(engine::monitor_history(app.handle().clone(), app.state::<Arc<DownloadEngine>>().inner().clone()));
             #[cfg(windows)]
             receive_windows_browser_args(app.handle(), &std::env::args().collect::<Vec<_>>());
             Ok(())
@@ -629,6 +630,22 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = &event {
+                let exiting = app.state::<HistoryExitState>();
+                if exiting.0.load(std::sync::atomic::Ordering::SeqCst) != 2 {
+                    api.prevent_exit();
+                }
+                if exiting.0.compare_exchange(0, 1, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst).is_ok() {
+                    let engine = app.state::<Arc<DownloadEngine>>().inner().clone();
+                    let app = app.clone();
+                    let code = code.unwrap_or(0);
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(error) = engine.persist_history().await { eprintln!("{error}"); }
+                        app.state::<HistoryExitState>().0.store(2, std::sync::atomic::Ordering::SeqCst);
+                        app.exit(code);
+                    });
+                }
+            }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = &event {
                 // Opening a URL also activates/reopens the app. Do not interpret

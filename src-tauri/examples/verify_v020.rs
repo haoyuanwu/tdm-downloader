@@ -156,6 +156,7 @@ fn new_task(url: &str, save: &str, total: u64, conns: usize) -> Arc<Mutex<Downlo
         user_agent: String::new(),
         headers: Vec::new(),
         resumable: true,
+        file_exists: None,
     }))
 }
 
